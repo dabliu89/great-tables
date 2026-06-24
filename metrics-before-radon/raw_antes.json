@@ -1,0 +1,443 @@
+{
+  "great_tables/_pipe.py": {
+    "loc": 103,
+    "lloc": 9,
+    "sloc": 10,
+    "comments": 0,
+    "multi": 70,
+    "blank": 23,
+    "single_comments": 0
+  },
+  "great_tables/_stub.py": {
+    "loc": 25,
+    "lloc": 5,
+    "sloc": 4,
+    "comments": 5,
+    "multi": 8,
+    "blank": 8,
+    "single_comments": 5
+  },
+  "great_tables/_gt_data.py": {
+    "loc": 1492,
+    "lloc": 1020,
+    "sloc": 933,
+    "comments": 167,
+    "multi": 69,
+    "blank": 321,
+    "single_comments": 169
+  },
+  "great_tables/_stubhead.py": {
+    "loc": 68,
+    "lloc": 8,
+    "sloc": 7,
+    "comments": 0,
+    "multi": 45,
+    "blank": 16,
+    "single_comments": 0
+  },
+  "great_tables/_options.py": {
+    "loc": 2205,
+    "lloc": 217,
+    "sloc": 1026,
+    "comments": 79,
+    "multi": 910,
+    "blank": 205,
+    "single_comments": 64
+  },
+  "great_tables/_types.py": {
+    "loc": 8,
+    "lloc": 5,
+    "sloc": 5,
+    "comments": 0,
+    "multi": 0,
+    "blank": 3,
+    "single_comments": 0
+  },
+  "great_tables/_formats_vals.py": {
+    "loc": 1527,
+    "lloc": 156,
+    "sloc": 428,
+    "comments": 13,
+    "multi": 884,
+    "blank": 202,
+    "single_comments": 13
+  },
+  "great_tables/_row_groups.py": {
+    "loc": 0,
+    "lloc": 0,
+    "sloc": 0,
+    "comments": 0,
+    "multi": 0,
+    "blank": 0,
+    "single_comments": 0
+  },
+  "great_tables/_cols_merge.py": {
+    "loc": 470,
+    "lloc": 189,
+    "sloc": 182,
+    "comments": 26,
+    "multi": 160,
+    "blank": 100,
+    "single_comments": 28
+  },
+  "great_tables/_utils_selenium.py": {
+    "loc": 90,
+    "lloc": 58,
+    "sloc": 66,
+    "comments": 1,
+    "multi": 0,
+    "blank": 23,
+    "single_comments": 1
+  },
+  "great_tables/loc.py": {
+    "loc": 86,
+    "lloc": 19,
+    "sloc": 84,
+    "comments": 13,
+    "multi": 0,
+    "blank": 2,
+    "single_comments": 0
+  },
+  "great_tables/style.py": {
+    "loc": 10,
+    "lloc": 3,
+    "sloc": 8,
+    "comments": 0,
+    "multi": 0,
+    "blank": 2,
+    "single_comments": 0
+  },
+  "great_tables/_substitution.py": {
+    "loc": 589,
+    "lloc": 156,
+    "sloc": 169,
+    "comments": 21,
+    "multi": 287,
+    "blank": 113,
+    "single_comments": 20
+  },
+  "great_tables/_databackend.py": {
+    "loc": 52,
+    "lloc": 38,
+    "sloc": 35,
+    "comments": 3,
+    "multi": 0,
+    "blank": 13,
+    "single_comments": 4
+  },
+  "great_tables/_scss.py": {
+    "loc": 194,
+    "lloc": 84,
+    "sloc": 124,
+    "comments": 26,
+    "multi": 3,
+    "blank": 40,
+    "single_comments": 27
+  },
+  "great_tables/_styles.py": {
+    "loc": 412,
+    "lloc": 162,
+    "sloc": 161,
+    "comments": 14,
+    "multi": 161,
+    "blank": 75,
+    "single_comments": 15
+  },
+  "great_tables/quarto.py": {
+    "loc": 13,
+    "lloc": 4,
+    "sloc": 3,
+    "comments": 0,
+    "multi": 6,
+    "blank": 4,
+    "single_comments": 0
+  },
+  "great_tables/_text.py": {
+    "loc": 151,
+    "lloc": 79,
+    "sloc": 72,
+    "comments": 5,
+    "multi": 19,
+    "blank": 51,
+    "single_comments": 9
+  },
+  "great_tables/_locale.py": {
+    "loc": 160,
+    "lloc": 215,
+    "sloc": 124,
+    "comments": 2,
+    "multi": 0,
+    "blank": 34,
+    "single_comments": 2
+  },
+  "great_tables/gt.py": {
+    "loc": 634,
+    "lloc": 270,
+    "sloc": 388,
+    "comments": 45,
+    "multi": 94,
+    "blank": 104,
+    "single_comments": 48
+  },
+  "great_tables/_utils_nanoplots.py": {
+    "loc": 1566,
+    "lloc": 704,
+    "sloc": 882,
+    "comments": 213,
+    "multi": 105,
+    "blank": 368,
+    "single_comments": 211
+  },
+  "great_tables/__init__.py": {
+    "loc": 63,
+    "lloc": 16,
+    "sloc": 46,
+    "comments": 5,
+    "multi": 0,
+    "blank": 12,
+    "single_comments": 5
+  },
+  "great_tables/_source_notes.py": {
+    "loc": 54,
+    "lloc": 8,
+    "sloc": 7,
+    "comments": 0,
+    "multi": 34,
+    "blank": 13,
+    "single_comments": 0
+  },
+  "great_tables/_tbl_data_align.py": {
+    "loc": 122,
+    "lloc": 56,
+    "sloc": 64,
+    "comments": 15,
+    "multi": 15,
+    "blank": 28,
+    "single_comments": 15
+  },
+  "great_tables/_spanners.py": {
+    "loc": 1731,
+    "lloc": 339,
+    "sloc": 426,
+    "comments": 75,
+    "multi": 897,
+    "blank": 333,
+    "single_comments": 75
+  },
+  "great_tables/_export.py": {
+    "loc": 755,
+    "lloc": 163,
+    "sloc": 245,
+    "comments": 44,
+    "multi": 312,
+    "blank": 153,
+    "single_comments": 45
+  },
+  "great_tables/_heading.py": {
+    "loc": 87,
+    "lloc": 9,
+    "sloc": 13,
+    "comments": 0,
+    "multi": 58,
+    "blank": 16,
+    "single_comments": 0
+  },
+  "great_tables/_modify_rows.py": {
+    "loc": 655,
+    "lloc": 100,
+    "sloc": 158,
+    "comments": 21,
+    "multi": 350,
+    "blank": 125,
+    "single_comments": 22
+  },
+  "great_tables/_boxhead.py": {
+    "loc": 417,
+    "lloc": 74,
+    "sloc": 85,
+    "comments": 14,
+    "multi": 226,
+    "blank": 92,
+    "single_comments": 14
+  },
+  "great_tables/_render_checks.py": {
+    "loc": 43,
+    "lloc": 17,
+    "sloc": 21,
+    "comments": 2,
+    "multi": 8,
+    "blank": 11,
+    "single_comments": 3
+  },
+  "great_tables/_footnotes.py": {
+    "loc": 159,
+    "lloc": 28,
+    "sloc": 32,
+    "comments": 11,
+    "multi": 99,
+    "blank": 21,
+    "single_comments": 7
+  },
+  "great_tables/_formats.py": {
+    "loc": 6610,
+    "lloc": 1635,
+    "sloc": 2611,
+    "comments": 418,
+    "multi": 2444,
+    "blank": 1134,
+    "single_comments": 421
+  },
+  "great_tables/utils_render_common.py": {
+    "loc": 54,
+    "lloc": 21,
+    "sloc": 21,
+    "comments": 17,
+    "multi": 0,
+    "blank": 16,
+    "single_comments": 17
+  },
+  "great_tables/_locations.py": {
+    "loc": 1576,
+    "lloc": 461,
+    "sloc": 520,
+    "comments": 103,
+    "multi": 643,
+    "blank": 300,
+    "single_comments": 113
+  },
+  "great_tables/_tab_create_modify.py": {
+    "loc": 493,
+    "lloc": 78,
+    "sloc": 97,
+    "comments": 8,
+    "multi": 300,
+    "blank": 89,
+    "single_comments": 7
+  },
+  "great_tables/_utils_render_html.py": {
+    "loc": 1683,
+    "lloc": 678,
+    "sloc": 1104,
+    "comments": 289,
+    "multi": 21,
+    "blank": 295,
+    "single_comments": 263
+  },
+  "great_tables/_render.py": {
+    "loc": 44,
+    "lloc": 27,
+    "sloc": 35,
+    "comments": 1,
+    "multi": 0,
+    "blank": 8,
+    "single_comments": 1
+  },
+  "great_tables/vals.py": {
+    "loc": 20,
+    "lloc": 2,
+    "sloc": 17,
+    "comments": 1,
+    "multi": 0,
+    "blank": 2,
+    "single_comments": 1
+  },
+  "great_tables/_body.py": {
+    "loc": 14,
+    "lloc": 7,
+    "sloc": 7,
+    "comments": 2,
+    "multi": 0,
+    "blank": 5,
+    "single_comments": 2
+  },
+  "great_tables/_utils_render_latex.py": {
+    "loc": 797,
+    "lloc": 325,
+    "sloc": 396,
+    "comments": 103,
+    "multi": 79,
+    "blank": 218,
+    "single_comments": 104
+  },
+  "great_tables/_tbl_data.py": {
+    "loc": 970,
+    "lloc": 534,
+    "sloc": 566,
+    "comments": 47,
+    "multi": 25,
+    "blank": 318,
+    "single_comments": 61
+  },
+  "great_tables/shiny.py": {
+    "loc": 61,
+    "lloc": 33,
+    "sloc": 42,
+    "comments": 0,
+    "multi": 0,
+    "blank": 17,
+    "single_comments": 2
+  },
+  "great_tables/_helpers.py": {
+    "loc": 1488,
+    "lloc": 279,
+    "sloc": 611,
+    "comments": 84,
+    "multi": 533,
+    "blank": 260,
+    "single_comments": 84
+  },
+  "great_tables/_utils.py": {
+    "loc": 287,
+    "lloc": 155,
+    "sloc": 151,
+    "comments": 26,
+    "multi": 26,
+    "blank": 85,
+    "single_comments": 25
+  },
+  "great_tables/_data_color/constants.py": {
+    "loc": 1172,
+    "lloc": 9,
+    "sloc": 1153,
+    "comments": 11,
+    "multi": 0,
+    "blank": 8,
+    "single_comments": 11
+  },
+  "great_tables/_data_color/palettes.py": {
+    "loc": 182,
+    "lloc": 107,
+    "sloc": 100,
+    "comments": 5,
+    "multi": 21,
+    "blank": 51,
+    "single_comments": 10
+  },
+  "great_tables/_data_color/__init__.py": {
+    "loc": 3,
+    "lloc": 2,
+    "sloc": 2,
+    "comments": 0,
+    "multi": 0,
+    "blank": 1,
+    "single_comments": 0
+  },
+  "great_tables/_data_color/base.py": {
+    "loc": 706,
+    "lloc": 216,
+    "sloc": 231,
+    "comments": 77,
+    "multi": 230,
+    "blank": 169,
+    "single_comments": 76
+  },
+  "great_tables/data/__init__.py": {
+    "loc": 1453,
+    "lloc": 140,
+    "sloc": 1279,
+    "comments": 24,
+    "multi": 4,
+    "blank": 162,
+    "single_comments": 8
+  }
+}
