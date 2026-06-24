@@ -1,10 +1,10 @@
 arquivo,funcoes,cc_media,cc_max,cc_soma,pior_rank,pior_classe,pior_funcao,pior_linha_ini
-great_tables/_pipe.py,1,1.0,1,1,A,,pipe,14
-great_tables/_stub.py,1,1.0,1,1,A,,reorder_stub_df,6
+great_tables/_heading.py,1,1.0,1,1,A,,tab_header,12
 great_tables/_stubhead.py,1,1.0,1,1,A,,tab_stubhead,11
 great_tables/quarto.py,1,1.0,1,1,A,,is_quarto_render,4
 great_tables/_source_notes.py,1,1.0,1,1,A,,tab_source_note,11
-great_tables/_heading.py,1,1.0,1,1,A,,tab_header,12
+great_tables/_pipe.py,1,1.0,1,1,A,,pipe,14
+great_tables/_stub.py,1,1.0,1,1,A,,reorder_stub_df,6
 great_tables/_body.py,1,1.0,1,1,A,,body_reassemble,11
 great_tables/_formats_vals.py,20,1.25,3,25,A,,_make_one_col_table,62
 great_tables/_locale.py,7,1.29,3,9,A,Locale,__init__,19
@@ -17,8 +17,8 @@ great_tables/data/__init__.py,6,2.17,4,13,A,_BackendNamespace,__getattr__,1434
 great_tables/_databackend.py,4,2.5,4,10,A,AbstractBackend,__subclasshook__,40
 great_tables/_gt_data.py,89,2.71,13,241,C,OptionsInfo,_validate_value,1209
 great_tables/_helpers.py,40,2.83,27,113,D,,nanoplot_options,1232
-great_tables/__init__.py,1,3.0,3,3,A,,__getattr__,49
 great_tables/_tbl_data_align.py,5,3.0,3,15,A,,is_number_like_column,49
+great_tables/__init__.py,1,3.0,3,3,A,,__getattr__,49
 great_tables/_export.py,10,3.1,6,31,B,,save,364
 great_tables/_data_color/palettes.py,11,3.18,12,35,C,GradientPalette,__init__,93
 great_tables/_substitution.py,15,3.47,9,52,B,SubSmallVals,to_html,487
