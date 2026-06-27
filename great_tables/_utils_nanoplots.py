@@ -112,6 +112,40 @@ def calc_ref_value(val_or_calc: int | float | str, data) -> int | float | str:
     raise ValueError(f"Unsupported nanoplot area value: {val_or_calc}")
 
 
+def _get_compact_format_spec(val: int | float) -> tuple[bool, int | None, int, bool]:
+    """
+    Determine the formatting settings used by `_format_number_compactly`.
+    """
+
+    abs_val = abs(val)
+
+    if abs_val < 0.01:
+        return True, None, 2, False
+
+    if abs_val < 1:
+        return True, None, 2, False
+
+    if abs_val < 100:
+        return True, None, 3, False
+
+    if abs_val < 1000:
+        return True, None, 3, False
+
+    if abs_val < 10000:
+        return False, 2, 3, True
+
+    if abs_val < 100000:
+        return False, 1, 3, True
+
+    if abs_val < 1000000:
+        return False, 0, 3, True
+
+    if abs_val < 1e15:
+        return False, 1, 3, True
+
+    return False, None, 2, False
+
+
 def _format_number_compactly(
     val: int | float,
     currency: str | None = None,
@@ -139,67 +173,7 @@ def _format_number_compactly(
     if val == 0:
         return "0"
 
-    if abs(val) < 0.01:
-        use_subunits = True
-        decimals = None
-
-        n_sigfig = 2
-        compact = False
-
-    elif abs(val) < 1:
-        use_subunits = True
-        decimals = None
-
-        n_sigfig = 2
-        compact = False
-
-    elif abs(val) < 100:
-        use_subunits = True
-        decimals = None
-
-        n_sigfig = 3
-        compact = False
-
-    elif abs(val) < 1000:
-        use_subunits = True
-        decimals = None
-
-        n_sigfig = 3
-        compact = False
-
-    elif abs(val) < 10000:
-        use_subunits = False
-        decimals = 2
-
-        n_sigfig = 3
-        compact = True
-
-    elif abs(val) < 100000:
-        use_subunits = False
-        decimals = 1
-
-        n_sigfig = 3
-        compact = True
-
-    elif abs(val) < 1000000:
-        use_subunits = False
-        decimals = 0
-
-        n_sigfig = 3
-        compact = True
-
-    elif abs(val) < 1e15:
-        use_subunits = False
-        decimals = 1
-
-        n_sigfig = 3
-        compact = True
-
-    else:
-        use_subunits = False
-        decimals = None
-        n_sigfig = 2
-        compact = False
+    use_subunits, decimals, n_sigfig, compact = _get_compact_format_spec(val)
 
     # Format value accordingly
 
