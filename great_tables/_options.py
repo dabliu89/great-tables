@@ -1322,57 +1322,12 @@ def opt_table_font(
     res = self
 
     if font is not None:
-        # If font is a string or GoogleFont object, convert to a list
-        if isinstance(font, (str, GoogleFont)):
-            font: list[str | GoogleFont] = [font]
-
-        if not isinstance(font, Iterable):
-            # We need to raise an exception here. Otherwise, if the provided `font` is not iterable,
-            # the `for item in font` loop will raise a `TypeError` with a message stating that the
-            # object is not iterable.
-            raise TypeError(
-                "`font=` must be a string/GoogleFont object or a list of strings/GoogleFont objects."
-            )
-
-        new_font_list: list[str] = []
-
-        for item in font:
-            if isinstance(item, str):
-                # Case where list item is a string; here, it's converted to a list
-                new_font_list.append(item)
-
-            elif isinstance(item, GoogleFont):
-                # Case where the list item is a GoogleFont object
-                new_font_list.append(item.get_font_name())
-
-                # Add the Google Font import statement to the internal font imports
-                import_stmt = item.make_import_stmt()
-                res = res._replace(_google_font_imports=res._google_font_imports.add(import_stmt))
-
-            else:
-                raise TypeError(
-                    "`font=` must be a string/GoogleFont object or a list of strings/GoogleFont objects."
-                )
-
-        font: list[str] = new_font_list
+        res, font = _opt_table_font_normalize(font, res)
 
     else:
         font = []
 
-    if stack is not None:
-        # Case where value is given to `stack=` and this is a keyword that returns a
-        # list of fonts (i.e., the font stack); in this case we combine with `font=` values
-        # (if provided) and we *always* replace the existing fonts (`add=` is ignored)
-        from great_tables._helpers import system_fonts
-
-        font_stack = system_fonts(name=stack)
-        combined_fonts = font + font_stack
-    elif add:
-        # Case where `font=` is prepended to existing fonts
-        combined_fonts = font + existing_fonts
-    else:
-        # Case where  `font=` replacing existing fonts
-        combined_fonts = font
+    combined_fonts = _opt_table_font_combined_fonts(font, existing_fonts, stack, add)
 
     res = tab_options(res, table_font_names=combined_fonts)
 
@@ -1392,6 +1347,55 @@ def opt_table_font(
         res = tab_options(res, table_font_style=style)
 
     return res
+
+
+def _opt_table_font_normalize(
+    font: str | list[str] | dict[str, str] | GoogleFont,
+    res: GTSelf,
+) -> tuple[GTSelf, list[str]]:
+    # Convert font inputs into a plain list of font names and collect Google Font imports.
+    if isinstance(font, (str, GoogleFont)):
+        font = [font]
+
+    if not isinstance(font, Iterable):
+        raise TypeError(
+            "`font=` must be a string/GoogleFont object or a list of strings/GoogleFont objects."
+        )
+
+    new_font_list: list[str] = []
+
+    for item in font:
+        if isinstance(item, str):
+            new_font_list.append(item)
+
+        elif isinstance(item, GoogleFont):
+            new_font_list.append(item.get_font_name())
+
+            import_stmt = item.make_import_stmt()
+            res = res._replace(_google_font_imports=res._google_font_imports.add(import_stmt))
+
+        else:
+            raise TypeError(
+                "`font=` must be a string/GoogleFont object or a list of strings/GoogleFont objects."
+            )
+
+    return res, new_font_list
+
+
+def _opt_table_font_combined_fonts(
+    font: list[str], existing_fonts: list[str], stack: FontStackName | None, add: bool
+) -> list[str]:
+    if stack is not None:
+        # When a stack is provided, it replaces the existing stack and `add` is ignored.
+        from great_tables._helpers import system_fonts
+
+        font_stack = system_fonts(name=stack)
+        return font + font_stack
+
+    if add:
+        return font + existing_fonts
+
+    return font
 
 
 def opt_stylize(
