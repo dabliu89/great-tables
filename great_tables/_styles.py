@@ -264,23 +264,24 @@ class CellStyleText(CellStyle):
         | None
     ) = None
 
+    def _font_name(self) -> str | FromColumn:
+        font = self.font
+        if isinstance(font, (str, FromColumn)):
+            # Case where `font=` is a string or a FromColumn expression
+            return font
+        if isinstance(font, GoogleFont):
+            # Case where `font=` is a GoogleFont
+            return font.get_font_name()
+        # Case where font is of an invalid type
+        raise ValueError(f"Invalid font type '{type(font)}' provided.")
+
     def _to_html_style(self) -> str:
         rendered = ""
 
         if self.color:
             rendered += f"color: {self.color};"
         if self.font:
-            font = self.font
-            if isinstance(font, (str, FromColumn)):
-                # Case where `font=` is a string or a FromColumn expression
-                font_name = font
-            elif isinstance(font, GoogleFont):
-                # Case where `font=` is a GoogleFont
-                font_name = font.get_font_name()
-            else:
-                # Case where font is of an invalid type
-                raise ValueError(f"Invalid font type '{type(font)}' provided.")
-            rendered += f"font-family: {font_name};"
+            rendered += f"font-family: {self._font_name()};"
         if self.size:
             rendered += f"font-size: {self.size};"
         if self.align:
