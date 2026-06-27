@@ -1206,6 +1206,43 @@ class OptionsInfo:
     type: str
     value: Any
 
+    def _raise_type_error(self, option_name: str, expected: str, value: Any) -> None:
+        raise TypeError(
+            f"Option `{option_name}` expects {expected}, but received type `{type(value).__name__}`."
+        )
+
+    def _validate_px_value(self, value: Any, option_name: str) -> Any:
+        if isinstance(value, (int, float)):
+            return f"{value}px"
+        if isinstance(value, str):
+            return value
+
+        self._raise_type_error(
+            option_name,
+            "a CSS length string (e.g., '5px', '100%', 'auto') or a numeric value",
+            value,
+        )
+
+    def _validate_bool_value(self, value: Any, option_name: str) -> Any:
+        if not isinstance(value, bool):
+            self._raise_type_error(option_name, "a boolean value", value)
+        return value
+
+    def _validate_scalar_value(self, value: Any, option_name: str) -> Any:
+        if not isinstance(value, (str, int, float)):
+            self._raise_type_error(option_name, "a string or numeric value", value)
+        return value
+
+    def _validate_values_value(self, value: Any, option_name: str) -> Any:
+        if not isinstance(value, (str, list)):
+            self._raise_type_error(option_name, "a string or list", value)
+        return value
+
+    def _validate_string_value(self, value: Any, option_name: str) -> Any:
+        if not isinstance(value, str):
+            self._raise_type_error(option_name, "a string value", value)
+        return value
+
     def _validate_value(self, value: Any, option_name: str) -> Any:
         """Validate and coerce an option value based on its type.
 
@@ -1224,48 +1261,17 @@ class OptionsInfo:
         if value is None:
             return value
 
-        if self.type == "px":
-            # CSS length values: accept str (e.g. "5px", "100%", "auto") or
-            # int/float (coerced to "{x}px")
-            if isinstance(value, (int, float)):
-                return f"{value}px"
-            elif isinstance(value, str):
-                return value
-            else:
-                raise TypeError(
-                    f"Option `{option_name}` expects a CSS length string (e.g., '5px', '100%', "
-                    f"'auto') or a numeric value, but received type `{type(value).__name__}`."
-                )
-        elif self.type in ("boolean", "logical"):
-            if not isinstance(value, bool):
-                raise TypeError(
-                    f"Option `{option_name}` expects a boolean value, "
-                    f"but received type `{type(value).__name__}`."
-                )
-            return value
-        elif self.type == "value":
-            if not isinstance(value, (str, int, float)):
-                raise TypeError(
-                    f"Option `{option_name}` expects a string or numeric value, "
-                    f"but received type `{type(value).__name__}`."
-                )
-            return value
-        elif self.type == "values":
-            if not isinstance(value, (str, list)):
-                raise TypeError(
-                    f"Option `{option_name}` expects a string or list, "
-                    f"but received type `{type(value).__name__}`."
-                )
-            return value
-        elif self.type == "overflow":
-            if not isinstance(value, str):
-                raise TypeError(
-                    f"Option `{option_name}` expects a string value, "
-                    f"but received type `{type(value).__name__}`."
-                )
-            return value
-        else:
-            return value
+        validators = {
+            "px": self._validate_px_value,
+            "boolean": self._validate_bool_value,
+            "logical": self._validate_bool_value,
+            "value": self._validate_scalar_value,
+            "values": self._validate_values_value,
+            "overflow": self._validate_string_value,
+        }
+
+        validator = validators.get(self.type)
+        return value if validator is None else validator(value, option_name)
 
 
 @dataclass(frozen=True)
