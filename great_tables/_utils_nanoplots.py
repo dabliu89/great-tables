@@ -112,6 +112,102 @@ def calc_ref_value(val_or_calc: int | float | str, data) -> int | float | str:
     raise ValueError(f"Unsupported nanoplot area value: {val_or_calc}")
 
 
+def _apply_custom_number_format(
+    val: int | float,
+    fn: Callable[..., str] | None,
+) -> str | None:
+    if fn is None:
+        return None
+
+    if callable(fn):
+        res = fn(val)
+
+        if not isinstance(res, str):
+            raise ValueError("The result of the formatting function must be a single string value.")
+
+        return res
+
+    return None
+
+
+def _get_number_format_profile(val: int | float) -> tuple[bool, int | None, int, bool]:
+    abs_val = abs(val)
+
+    if abs_val < 0.01:
+        return True, None, 2, False
+
+    if abs_val < 1:
+        return True, None, 2, False
+
+    if abs_val < 100:
+        return True, None, 3, False
+
+    if abs_val < 1000:
+        return True, None, 3, False
+
+    if abs_val < 10000:
+        return False, 2, 3, True
+
+    if abs_val < 100000:
+        return False, 1, 3, True
+
+    if abs_val < 1000000:
+        return False, 0, 3, True
+
+    if abs_val < 1e15:
+        return False, 1, 3, True
+
+    return False, None, 2, False
+
+
+def _format_number_default(
+    val: int | float,
+    currency: str | None,
+    as_integer: bool,
+    use_subunits: bool,
+    decimals: int | None,
+    n_sigfig: int,
+    compact: bool,
+) -> str:
+    from great_tables.vals import fmt_currency, fmt_integer, fmt_number, fmt_scientific
+
+    if currency is not None:
+        if abs(val) >= 1e15:
+            val_formatted = fmt_currency(
+                1e15,
+                currency=currency,
+                use_subunits=False,
+                decimals=0,
+            )
+
+            return f">{val_formatted}"
+
+        return fmt_currency(
+            val,
+            currency=currency,
+            use_subunits=use_subunits,
+            decimals=decimals,
+        )
+
+    if abs(val) < 0.01 or abs(val) >= 1e15:
+        return fmt_scientific(
+            val,
+            exp_style="E",
+            n_sigfig=n_sigfig,
+            decimals=1,
+        )
+
+    if as_integer and -100 < val < 100:
+        return fmt_integer(val)
+
+    return fmt_number(
+        val,
+        n_sigfig=n_sigfig,
+        decimals=1,
+        compact=compact,
+    )
+
+
 def _format_number_compactly(
     val: int | float,
     currency: str | None = None,
@@ -122,16 +218,9 @@ def _format_number_compactly(
     Format a single numeric value compactly, using a currency if provided.
     """
 
-    from great_tables.vals import fmt_currency, fmt_integer, fmt_number, fmt_scientific
-
-    if fn is not None and isinstance(fn, Callable):
-        res = fn(val)
-
-        # Check whether the result is a single string value; if not, raise an error
-        if not isinstance(res, str):
-            raise ValueError("The result of the formatting function must be a single string value.")
-
-        return res
+    custom_format = _apply_custom_number_format(val=val, fn=fn)
+    if custom_format is not None:
+        return custom_format
 
     if _is_na(val):
         return "NA"
@@ -139,111 +228,17 @@ def _format_number_compactly(
     if val == 0:
         return "0"
 
-    if abs(val) < 0.01:
-        use_subunits = True
-        decimals = None
+    use_subunits, decimals, n_sigfig, compact = _get_number_format_profile(val)
 
-        n_sigfig = 2
-        compact = False
-
-    elif abs(val) < 1:
-        use_subunits = True
-        decimals = None
-
-        n_sigfig = 2
-        compact = False
-
-    elif abs(val) < 100:
-        use_subunits = True
-        decimals = None
-
-        n_sigfig = 3
-        compact = False
-
-    elif abs(val) < 1000:
-        use_subunits = True
-        decimals = None
-
-        n_sigfig = 3
-        compact = False
-
-    elif abs(val) < 10000:
-        use_subunits = False
-        decimals = 2
-
-        n_sigfig = 3
-        compact = True
-
-    elif abs(val) < 100000:
-        use_subunits = False
-        decimals = 1
-
-        n_sigfig = 3
-        compact = True
-
-    elif abs(val) < 1000000:
-        use_subunits = False
-        decimals = 0
-
-        n_sigfig = 3
-        compact = True
-
-    elif abs(val) < 1e15:
-        use_subunits = False
-        decimals = 1
-
-        n_sigfig = 3
-        compact = True
-
-    else:
-        use_subunits = False
-        decimals = None
-        n_sigfig = 2
-        compact = False
-
-    # Format value accordingly
-
-    if currency is not None:
-        if abs(val) >= 1e15:
-            val_formatted = fmt_currency(
-                1e15,
-                currency=currency,
-                use_subunits=False,
-                decimals=0,
-                # compact=True,
-            )
-
-            val_formatted = f">{val_formatted}"
-
-        else:
-            val_formatted = fmt_currency(
-                val,
-                currency=currency,
-                use_subunits=use_subunits,
-                decimals=decimals,
-                # compact=compact,
-            )
-
-    else:
-        if abs(val) < 0.01 or abs(val) >= 1e15:
-            val_formatted = fmt_scientific(
-                val,
-                exp_style="E",
-                n_sigfig=n_sigfig,
-                decimals=1,
-            )
-
-        else:
-            if as_integer and val > -100 and val < 100:
-                val_formatted = fmt_integer(val)
-
-            else:
-                val_formatted = fmt_number(
-                    val,
-                    n_sigfig=n_sigfig,
-                    decimals=1,
-                    compact=compact,
-                )
+    val_formatted = _format_number_default(
+        val=val,
+        currency=currency,
+        as_integer=as_integer,
+        use_subunits=use_subunits,
+        decimals=decimals,
+        n_sigfig=n_sigfig,
+        compact=compact,
+    )
 
     return val_formatted[0]
 
