@@ -6214,6 +6214,110 @@ class FmtFlag:
         return re.sub(r"<svg.*?>", replacement, flag_svg)
 
 
+def _fmt_nanoplot_expand_y(
+    data_tbl: DataFrameLike | Agnostic,
+    columns: str,
+    rows: int | list[int] | None,
+) -> list[int | float]:
+    from great_tables._utils import _flatten_list
+
+    if rows is not None:
+        all_y_vals_raw = to_list(data_tbl[columns][rows])
+    else:
+        all_y_vals_raw = to_list(data_tbl[columns])
+
+    all_y_vals = []
+
+    for data_vals_i in all_y_vals_raw:
+        # TODO: this dictionary handling seems redundant with _generate_data_vals dict handling?
+        # Can this if-clause be removed?
+        if isinstance(data_vals_i, dict):
+            if len(data_vals_i) == 1:
+                # If there is only one key in the dictionary, then we can assume that the
+                # dictionary deals with y-values only
+                data_vals_i = list(data_vals_i.values())[0]
+
+            else:
+                # Otherwise assume that the dictionary contains x and y values; extract
+                # the y values
+                data_vals_i = data_vals_i["y"]
+
+        data_vals_i = _generate_data_vals(data_vals=data_vals_i)
+
+        # If not a list, then convert to a list
+        if not isinstance(data_vals_i, list):
+            data_vals_i = [data_vals_i]
+
+        all_y_vals.extend(data_vals_i)
+
+    all_y_vals = _flatten_list(all_y_vals)
+
+    # Get the minimum and maximum values from the list
+    return [min(all_y_vals), max(all_y_vals)]
+
+
+def _fmt_nanoplot_fn(
+    x: Any,
+    context: str,
+    data_tbl: DataFrameLike | Agnostic,
+    plot_type: PlotType,
+    plot_height: str,
+    missing_vals: MissingVals,
+    reference_line: str | int | float | None,
+    reference_area: list[Any] | None,
+    expand_x: list[int] | list[float] | list[int | float] | None,
+    expand_y: list[int] | list[float] | list[int | float] | None,
+    all_single_y_vals: list[int | float] | None,
+    options_plots: dict[str, Any],
+) -> str:
+    if context == "latex":
+        raise NotImplementedError("fmt_nanoplot() is not supported in LaTeX.")
+
+    # If the `x` value is a Pandas 'NA', then return the same value
+    # We have to pass in a dataframe to this function. Everything action that
+    # requires a dataframe import should go through _tbl_data.
+    if is_na(data_tbl, x):
+        return x
+
+    # Generate data vals from the input `x` value
+    x = _generate_data_vals(data_vals=x)
+
+    # TODO: where are tuples coming from? Need example / tests that induce tuples
+    # If `x` is a tuple, then we have x and y values; otherwise, we only have y values
+    if isinstance(x, tuple):
+        x_vals, y_vals = x
+
+        # Ensure that both objects are lists
+        if not isinstance(x_vals, list) or not isinstance(y_vals, list):
+            raise ValueError("The 'x' and 'y' values must be lists.")
+
+        # Ensure that the lists contain only numeric values (ints and floats)
+        if not all(isinstance(val, (int, float)) for val in x_vals):
+            raise ValueError("The 'x' values must be numeric.")
+
+        # Ensure that the lengths of the x and y values are the same
+        if len(x_vals) != len(y_vals):
+            raise ValueError("The lengths of the 'x' and 'y' values must be the same.")
+
+    else:
+        y_vals = x
+        x_vals = None
+
+    return _generate_nanoplot(
+        y_vals=y_vals,
+        y_ref_line=reference_line,
+        y_ref_area=reference_area,
+        x_vals=x_vals,
+        expand_x=expand_x,
+        expand_y=expand_y,
+        missing_vals=missing_vals,
+        all_single_y_vals=all_single_y_vals,
+        plot_type=plot_type,
+        svg_height=plot_height,
+        **options_plots,
+    )
+
+
 def fmt_nanoplot(
     self: GTSelf,
     columns: str | None = None,
@@ -6495,108 +6599,29 @@ def fmt_nanoplot(
 
     # For autoscale, we need to get the minimum and maximum from all values for the y-axis
     if autoscale:
-        from great_tables._utils import _flatten_list
-
         # TODO: if a column of delimiter separated strings is passed. E.g. "1 2 3 4". Does this mean
         # that autoscale does not work? In this case, is col_i_y_vals_raw a string that gets processed?
         # downstream?
-        if rows is not None:
-            all_y_vals_raw = to_list(data_tbl[columns][rows])
-        else:
-            all_y_vals_raw = to_list(data_tbl[columns])
+        expand_y = _fmt_nanoplot_expand_y(data_tbl=data_tbl, columns=columns, rows=rows)
 
-        all_y_vals = []
-
-        for data_vals_i in all_y_vals_raw:
-            # TODO: this dictionary handling seems redundant with _generate_data_vals dict handling?
-            # Can this if-clause be removed?
-            if isinstance(data_vals_i, dict):
-                if len(data_vals_i) == 1:
-                    # If there is only one key in the dictionary, then we can assume that the
-                    # dictionary deals with y-values only
-                    data_vals_i = list(data_vals_i.values())[0]
-
-                else:
-                    # Otherwise assume that the dictionary contains x and y values; extract
-                    # the y values
-                    data_vals_i = data_vals_i["y"]
-
-            data_vals_i = _generate_data_vals(data_vals=data_vals_i)
-
-            # If not a list, then convert to a list
-            if not isinstance(data_vals_i, list):
-                data_vals_i = [data_vals_i]
-
-            all_y_vals.extend(data_vals_i)
-
-        all_y_vals = _flatten_list(all_y_vals)
-
-        # Get the minimum and maximum values from the list
-        expand_y = [min(all_y_vals), max(all_y_vals)]
-
-    # Generate a function that will operate on single `x` values in the table body using both
-    # the date and time format strings
-    def fmt_nanoplot_fn(
-        x: Any,
-        context: str,
-        plot_type: PlotType = plot_type,
-        plot_height: str = plot_height,
-        missing_vals: MissingVals = missing_vals,
-        reference_line: str | int | float | None = reference_line,
-        reference_area: list[Any] | None = reference_area,
-        all_single_y_vals: list[int | float] | None = all_single_y_vals,
-        options_plots: dict[str, Any] = options_plots,
-    ) -> str:
-        if context == "latex":
-            raise NotImplementedError("fmt_nanoplot() is not supported in LaTeX.")
-
-        # If the `x` value is a Pandas 'NA', then return the same value
-        # We have to pass in a dataframe to this function. Everything action that
-        # requires a dataframe import should go through _tbl_data.
-        if is_na(data_tbl, x):
-            return x
-
-        # Generate data vals from the input `x` value
-        x = _generate_data_vals(data_vals=x)
-
-        # TODO: where are tuples coming from? Need example / tests that induce tuples
-        # If `x` is a tuple, then we have x and y values; otherwise, we only have y values
-        if isinstance(x, tuple):
-            x_vals, y_vals = x
-
-            # Ensure that both objects are lists
-            if not isinstance(x_vals, list) or not isinstance(y_vals, list):
-                raise ValueError("The 'x' and 'y' values must be lists.")
-
-            # Ensure that the lists contain only numeric values (ints and floats)
-            if not all(isinstance(val, (int, float)) for val in x_vals):
-                raise ValueError("The 'x' values must be numeric.")
-
-            # Ensure that the lengths of the x and y values are the same
-            if len(x_vals) != len(y_vals):
-                raise ValueError("The lengths of the 'x' and 'y' values must be the same.")
-
-        else:
-            y_vals = x
-            x_vals = None
-
-        nanoplot = _generate_nanoplot(
-            y_vals=y_vals,
-            y_ref_line=reference_line,
-            y_ref_area=reference_area,
-            x_vals=x_vals,
+    return fmt_by_context(
+        self,
+        pf_format=partial(
+            _fmt_nanoplot_fn,
+            data_tbl=data_tbl,
+            plot_type=plot_type,
+            plot_height=plot_height,
+            missing_vals=missing_vals,
+            reference_line=reference_line,
+            reference_area=reference_area,
             expand_x=expand_x,
             expand_y=expand_y,
-            missing_vals=missing_vals,
             all_single_y_vals=all_single_y_vals,
-            plot_type=plot_type,
-            svg_height=plot_height,
-            **options_plots,
-        )
-
-        return nanoplot
-
-    return fmt_by_context(self, pf_format=fmt_nanoplot_fn, columns=columns, rows=rows)
+            options_plots=options_plots,
+        ),
+        columns=columns,
+        rows=rows,
+    )
 
 
 def _generate_data_vals(
@@ -6616,75 +6641,82 @@ def _generate_data_vals(
         data_vals = to_list(data_vals)
 
     if isinstance(data_vals, list):
-        # If the list contains string values, determine whether they are date values
-        if all(isinstance(val, str) for val in data_vals):
-            if not is_x_axis:
-                raise ValueError("Only the x-axis of a nanoplot allows strings.")
-            if re.search(r"\d{1,4}-\d{2}-\d{2}", data_vals[0]):
-                data_vals = [_iso_str_to_date(val) for val in data_vals]
+        return _generate_data_vals_from_list(data_vals=data_vals, is_x_axis=is_x_axis)
 
-                # Transform the date values to numeric values
-                data_vals = [val.toordinal() for val in data_vals]
-
-        # If the cell value is a list of floats/ints, then return the same value
-
-        # Check that the values within the list are numeric; missing values are allowed
-        for val in data_vals:
-            if val is not None and not isinstance(val, (int, float)):
-                raise ValueError(f"The input data values must be numeric.\n\nValue received: {val}")
-
+    if isinstance(data_vals, (int, float)):
         return data_vals
 
-    elif isinstance(data_vals, int) or isinstance(data_vals, float):
-        return data_vals
+    if isinstance(data_vals, str):
+        return _generate_data_vals_from_string(data_vals=data_vals, is_x_axis=is_x_axis)
 
-    elif isinstance(data_vals, str):
-        # If the cell value is a string, assume it is a value stream and convert to a list
+    if isinstance(data_vals, dict):
+        return _generate_data_vals_from_dict(data_vals=data_vals)
 
-        # Detect whether there are time values or numeric values in the string
-        if re.search(r"\d{1,4}-\d{2}-\d{2}", data_vals) and is_x_axis:
-            data_vals = _process_time_stream(data_vals)
-        else:
-            data_vals = _process_number_stream(data_vals)
+    raise NotImplementedError("The input data values must be a string.")
 
-    elif isinstance(data_vals, dict):
-        # If the cell value is a dictionary, assume it contains data values
-        # This is possibly for x and for y
 
-        # Determine the number of keys in the dictionary
-        num_keys = len(data_vals.keys())
+def _generate_data_vals_from_list(
+    data_vals: list[Any], is_x_axis: bool
+) -> list[float]:
+    # If the list contains string values, determine whether they are date values.
+    if all(isinstance(val, str) for val in data_vals):
+        if not is_x_axis:
+            raise ValueError("Only the x-axis of a nanoplot allows strings.")
+        if re.search(r"\d{1,4}-\d{2}-\d{2}", data_vals[0]):
+            data_vals = [_iso_str_to_date(val) for val in data_vals]
 
-        # If the dictionary contains only one key, then assume that the values are for y
-        if num_keys == 1:
-            data_vals = list(data_vals.values())[0]
+            # Transform the date values to numeric values.
+            data_vals = [val.toordinal() for val in data_vals]
 
-            # The data values can be anything, so recursively call this function to process them
-            data_vals = _generate_data_vals(data_vals=data_vals)
-
-        if num_keys >= 2:
-            # For two or more keys, we need to see if the 'x' and 'y' keys are present
-            if "x" in data_vals and "y" in data_vals:
-                x_vals: Any = data_vals["x"]
-                y_vals: Any = data_vals["y"]
-
-                # The data values can be anything, so recursively call this function to process them
-                x_vals = _generate_data_vals(data_vals=x_vals, is_x_axis=True)
-                y_vals = _generate_data_vals(data_vals=y_vals)
-
-                # Ensure that the lengths of the x and y values are the same
-                if len(x_vals) != len(y_vals):
-                    raise ValueError("The lengths of the 'x' and 'y' values must be the same.")
-
-                return x_vals, y_vals
-
-            else:
-                raise ValueError("The dictionary must contain 'x' and 'y' keys.")
-
-    else:
-        # Raise not implemented
-        raise NotImplementedError("The input data values must be a string.")
+    # Check that the values within the list are numeric; missing values are allowed.
+    for val in data_vals:
+        if val is not None and not isinstance(val, (int, float)):
+            raise ValueError(f"The input data values must be numeric.\n\nValue received: {val}")
 
     return data_vals
+
+
+def _generate_data_vals_from_string(data_vals: str, is_x_axis: bool) -> list[float]:
+    # Detect whether there are time values or numeric values in the string.
+    if re.search(r"\d{1,4}-\d{2}-\d{2}", data_vals) and is_x_axis:
+        return _process_time_stream(data_vals)
+
+    return _process_number_stream(data_vals)
+
+
+def _generate_data_vals_from_dict(
+    data_vals: dict[str, Any],
+) -> list[float] | tuple[list[float], list[float]]:
+    # If the cell value is a dictionary, assume it contains data values.
+    # This is possibly for x and for y.
+    num_keys = len(data_vals.keys())
+
+    # If the dictionary contains only one key, then assume that the values are for y.
+    if num_keys == 1:
+        data_vals = list(data_vals.values())[0]
+
+        # The data values can be anything, so recursively call this function to process them.
+        return _generate_data_vals(data_vals=data_vals)
+
+    if num_keys >= 2:
+        # For two or more keys, we need to see if the 'x' and 'y' keys are present.
+        if "x" in data_vals and "y" in data_vals:
+            x_vals: Any = data_vals["x"]
+            y_vals: Any = data_vals["y"]
+
+            # The data values can be anything, so recursively call this function to process them.
+            x_vals = _generate_data_vals(data_vals=x_vals, is_x_axis=True)
+            y_vals = _generate_data_vals(data_vals=y_vals)
+
+            # Ensure that the lengths of the x and y values are the same.
+            if len(x_vals) != len(y_vals):
+                raise ValueError("The lengths of the 'x' and 'y' values must be the same.")
+
+            return x_vals, y_vals
+
+        raise ValueError("The dictionary must contain 'x' and 'y' keys.")
+
+    raise NotImplementedError("The input data values must be a string.")
 
 
 def _process_number_stream(data_vals: str) -> list[float]:
