@@ -2800,6 +2800,113 @@ def _resolve_duration_style_params(
     )
 
 
+def _resolve_duration_seconds(x: Any, input_units: str | None) -> float | None:
+    import numbers
+    from datetime import timedelta
+
+    if isinstance(x, timedelta):
+        return x.total_seconds()
+
+    if isinstance(x, numbers.Real):
+        if input_units is None:
+            raise ValueError(
+                "`input_units` must be supplied when formatting numeric columns as durations. "
+                "Use one of 'seconds', 'minutes', 'hours', 'days', or 'weeks'."
+            )
+        return float(x) * _SECONDS_CONVERSION[input_units]
+
+    return None
+
+
+def _build_duration_parts(
+    x_seconds: float,
+    output_units: list[str],
+    trim_zero_units: list[str],
+    max_output_units: int | None,
+) -> tuple[list[tuple[str, int]], bool]:
+    x_seconds_abs = abs(x_seconds)
+    time_parts: list[tuple[str, int]] = []
+    remainder = x_seconds_abs
+
+    for unit in output_units:
+        factor = _SECONDS_CONVERSION[unit]
+        value = int(remainder // factor)
+        remainder = remainder % factor
+        time_parts.append((unit, value))
+
+    if trim_zero_units:
+        time_parts = _trim_duration_parts(time_parts, trim_zero_units)
+
+    if not time_parts:
+        time_parts = [(output_units[-1], 0)]
+
+    all_zero = all(v == 0 for _, v in time_parts)
+    has_sub_unit_remainder = remainder > 0 and all_zero
+
+    if max_output_units is not None and len(time_parts) > max_output_units:
+        time_parts = time_parts[:max_output_units]
+
+    return time_parts, has_sub_unit_remainder
+
+
+def _format_duration_by_style(
+    duration_style: str,
+    time_parts: list[tuple[str, int]],
+    output_units: list[str],
+    colon_sep_output_units: list[str] | None,
+    colon_sep_trim_leading: bool,
+    sep_mark: str,
+    has_sub_unit_remainder: bool,
+    locale: str | None,
+) -> str:
+    if duration_style == "colon-sep":
+        return _format_duration_colon_sep(
+            time_parts=time_parts,
+            output_units=output_units,
+            colon_sep_output_units=colon_sep_output_units,
+            colon_sep_trim_leading=colon_sep_trim_leading,
+            sep_mark=sep_mark,
+        )
+    if duration_style == "iso":
+        return _format_duration_iso(time_parts=time_parts)
+    if duration_style == "wide":
+        return _format_duration_wide(
+            time_parts=time_parts,
+            sep_mark=sep_mark,
+            has_sub_unit_remainder=has_sub_unit_remainder,
+            locale=locale,
+        )
+    return _format_duration_narrow(
+        time_parts=time_parts,
+        sep_mark=sep_mark,
+        has_sub_unit_remainder=has_sub_unit_remainder,
+        locale=locale,
+    )
+
+
+def _decorate_duration_value(
+    x_formatted: str,
+    is_negative: bool,
+    x_seconds_abs: float,
+    force_sign: bool,
+    pattern: str,
+    context: str,
+) -> str:
+    if is_negative:
+        minus_mark = _context_minus_mark(context=context)
+        x_formatted = minus_mark + x_formatted
+
+    if force_sign and not is_negative and x_seconds_abs > 0:
+        x_formatted = "+" + x_formatted
+
+    if pattern != "{x}":
+        if context == "latex":
+            pattern = escape_pattern_str_latex(pattern_str=pattern)
+        x_formatted = pattern.replace("{x}", x_formatted)
+
+    return x_formatted
+
+
 def fmt_duration_context(
     x: int | float | None,
     data: GTData,
@@ -2821,101 +2928,39 @@ def fmt_duration_context(
     if is_na(data._tbl_data, x):
         return x
 
-    import numbers
-    from datetime import timedelta
-
-    # Handle timedelta input
-    if isinstance(x, timedelta):
-        # Convert timedelta to total seconds
-        x_seconds = x.total_seconds()
-    elif isinstance(x, numbers.Real):
-        if input_units is None:
-            raise ValueError(
-                "`input_units` must be supplied when formatting numeric columns as durations. "
-                "Use one of 'seconds', 'minutes', 'hours', 'days', or 'weeks'."
-            )
-        x_seconds = float(x) * _SECONDS_CONVERSION[input_units]
-    else:
+    x_seconds = _resolve_duration_seconds(x=x, input_units=input_units)
+    if x_seconds is None:
         return str(x)
 
-    # Determine sign
     is_negative = x_seconds < 0
     x_seconds_abs = abs(x_seconds)
 
-    # Decompose into time parts
-    time_parts: list[tuple[str, int]] = []
-    remainder = x_seconds_abs
+    time_parts, has_sub_unit_remainder = _build_duration_parts(
+        x_seconds=x_seconds,
+        output_units=output_units,
+        trim_zero_units=trim_zero_units,
+        max_output_units=max_output_units,
+    )
 
-    for unit in output_units:
-        factor = _SECONDS_CONVERSION[unit]
-        value = int(remainder // factor)
-        remainder = remainder % factor
-        time_parts.append((unit, value))
+    x_formatted = _format_duration_by_style(
+        duration_style=duration_style,
+        time_parts=time_parts,
+        output_units=output_units,
+        colon_sep_output_units=colon_sep_output_units,
+        colon_sep_trim_leading=colon_sep_trim_leading,
+        sep_mark=sep_mark,
+        has_sub_unit_remainder=has_sub_unit_remainder,
+        locale=locale,
+    )
 
-    # Apply trim_zero_units
-    if trim_zero_units:
-        time_parts = _trim_duration_parts(time_parts, trim_zero_units)
-
-    # Ensure at least one unit remains (the smallest)
-    if not time_parts:
-        time_parts = [(output_units[-1], 0)]
-
-    # If all values are zero but there was a remainder (value smaller than smallest unit)
-    all_zero = all(v == 0 for _, v in time_parts)
-    has_sub_unit_remainder = remainder > 0 and all_zero
-
-    # Apply max_output_units
-    if max_output_units is not None and len(time_parts) > max_output_units:
-        time_parts = time_parts[:max_output_units]
-
-    # Format based on style
-    if duration_style == "colon-sep":
-        x_formatted = _format_duration_colon_sep(
-            time_parts=time_parts,
-            output_units=output_units,
-            colon_sep_output_units=colon_sep_output_units,
-            colon_sep_trim_leading=colon_sep_trim_leading,
-            sep_mark=sep_mark,
-        )
-    elif duration_style == "iso":
-        x_formatted = _format_duration_iso(time_parts=time_parts)
-    elif duration_style == "narrow":
-        x_formatted = _format_duration_narrow(
-            time_parts=time_parts,
-            sep_mark=sep_mark,
-            has_sub_unit_remainder=has_sub_unit_remainder,
-            locale=locale,
-        )
-    elif duration_style == "wide":
-        x_formatted = _format_duration_wide(
-            time_parts=time_parts,
-            sep_mark=sep_mark,
-            has_sub_unit_remainder=has_sub_unit_remainder,
-            locale=locale,
-        )
-    else:
-        x_formatted = _format_duration_narrow(
-            time_parts=time_parts,
-            sep_mark=sep_mark,
-            has_sub_unit_remainder=has_sub_unit_remainder,
-            locale=locale,
-        )
-
-    # Apply sign
-    if is_negative:
-        minus_mark = _context_minus_mark(context=context)
-        x_formatted = minus_mark + x_formatted
-
-    if force_sign and not is_negative and x_seconds_abs > 0:
-        x_formatted = "+" + x_formatted
-
-    # Use a supplied pattern specification to decorate the formatted value
-    if pattern != "{x}":
-        if context == "latex":
-            pattern = escape_pattern_str_latex(pattern_str=pattern)
-        x_formatted = pattern.replace("{x}", x_formatted)
-
-    return x_formatted
+    return _decorate_duration_value(
+        x_formatted=x_formatted,
+        is_negative=is_negative,
+        x_seconds_abs=x_seconds_abs,
+        force_sign=force_sign,
+        pattern=pattern,
+        context=context,
+    )
 
 
 def _trim_duration_parts(
@@ -5892,45 +5937,51 @@ class FmtIcon:
 
     SPAN_TEMPLATE: ClassVar = '<span style="white-space:nowrap;">{}</span>'
 
+    def _split_icons(self, val: str) -> list[str]:
+        if "," in val:
+            return re.split(r",\s*", val)
+
+        return [val]
+
+    def _resolve_height(self) -> str:
+        if self.height is None:
+            return "1em"
+
+        return self.height
+
+    def _resolve_stroke_width(self) -> str:
+        if self.stroke_width is None:
+            return "1px"
+
+        if isinstance(self.stroke_width, (int, float)):
+            return f"{self.stroke_width}px"
+
+        return self.stroke_width
+
+    def _resolve_fill_color(self, icon: str) -> str | None:
+        if isinstance(self.fill_color, dict):
+            return self.fill_color.get(icon)
+
+        return self.fill_color
+
     def to_html(self, val: Any):
         if is_na(self.dispatch_on, val):
             return val
 
-        if "," in val:
-            icon_list = re.split(r",\s*", val)
-        else:
-            icon_list = [val]
-
-        if self.height is None:
-            height = "1em"
-        else:
-            height = self.height
-
-        if self.stroke_width is None:
-            stroke_width = "1px"
-        elif isinstance(self.stroke_width, (int, float)):
-            stroke_width = f"{self.stroke_width}px"
-        else:
-            stroke_width = self.stroke_width
+        icon_list = self._split_icons(val)
+        height = self._resolve_height()
+        stroke_width = self._resolve_stroke_width()
 
         out: list[str] = []
 
         for icon in icon_list:
-            if isinstance(self.fill_color, dict):
-                if icon in self.fill_color:
-                    fill_color = self.fill_color[icon]
-                else:
-                    fill_color = None
-            else:
-                fill_color = self.fill_color
-
             icon_svg = faicons.icon_svg(
                 icon,
                 height=height,
                 stroke=self.stroke_color,
                 stroke_width=stroke_width,
                 stroke_opacity=str(self.stroke_alpha),
-                fill=fill_color,
+                fill=self._resolve_fill_color(icon),
                 fill_opacity=str(self.fill_alpha),
                 margin_left=self.margin_left,
                 margin_right=self.margin_right,
