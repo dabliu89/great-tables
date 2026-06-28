@@ -1096,84 +1096,59 @@ def _generate_nanoplot_impl(
 
     n_segments = len(start_data_y_points)
 
-    #
-    # Generate a curved data line
-    #
+    data_path_tags = _build_nanoplot_line_path_tags(
+        plot_type=plot_type,
+        show_data_line=show_data_line,
+        data_line_type=data_line_type,
+        n_segments=n_segments,
+        start_data_y_points=start_data_y_points,
+        end_data_y_points=end_data_y_points,
+        data_x_points=data_x_points,
+        data_y_points=data_y_points,
+        x_d=x_d,
+        data_line_stroke_color=data_line_stroke_color,
+        data_line_stroke_width=data_line_stroke_width,
+    )
 
-    if plot_type == "line" and show_data_line and data_line_type == "curved":
-        data_path_tags = []
-
-        for i in range(n_segments):
-            curve_x = data_x_points[start_data_y_points[i] : end_data_y_points[i]]
-            curve_y = data_y_points[start_data_y_points[i] : end_data_y_points[i]]
-
-            curved_path_string = [f"M {curve_x[0]},{curve_y[0]}"]
-
-            for j in range(1, len(curve_x)):
-                point_b1 = f"{curve_x[j - 1] + x_d / 2},{curve_y[j - 1]}"
-                point_b2 = f"{curve_x[j] - x_d / 2},{curve_y[j]}"
-                point_i = f"{curve_x[j]},{curve_y[j]}"
-
-                path_string_j = f"C {point_b1} {point_b2} {point_i}"
-
-                curved_path_string.append(path_string_j)
-
-            curved_path_string_i = " ".join(curved_path_string)
-
-            data_path_tags_i = f'<path d="{curved_path_string_i}" stroke="{data_line_stroke_color}" stroke-width="{data_line_stroke_width}" fill="none"></path>'
-
-            data_path_tags.append(data_path_tags_i)
-
-        data_path_tags = "\n".join(data_path_tags)
-
-    if plot_type == "line" and show_data_line and data_line_type == "straight":
-        data_path_tags = []
-
-        for i in range(n_segments):
-            line_x = data_x_points[start_data_y_points[i] : end_data_y_points[i]]
-            line_y = data_y_points[start_data_y_points[i] : end_data_y_points[i]]
-
-            line_xy = " ".join((f"{x},{y}" for x, y in zip(line_x, line_y)))
-
-            data_path_tags_i = f'<polyline points="{line_xy}" stroke="{data_line_stroke_color}" stroke-width="{data_line_stroke_width}" fill="none"></polyline>'
-
-            data_path_tags.append(data_path_tags_i)
-
-        data_path_tags = "".join(data_path_tags)
-
-    #
-    # Generate data points
-    #
-
-    if plot_type == "line" and show_data_points:
-        circle_strings = []
-
-        for i, (data_x_point_i, data_y_point_i) in enumerate(zip(data_x_points, data_y_points)):
-            data_point_radius_i = data_point_radius[i]
-            data_point_stroke_color_i = data_point_stroke_color[i]
-            data_point_stroke_width_i = data_point_stroke_width[i]
-            data_point_fill_color_i = data_point_fill_color[i]
-
-            if data_y_point_i is None:
-                if missing_vals == "marker":
-                    # Create a symbol that should denote that a missing value is present
-                    circle_strings_i = f'<circle cx="{data_x_point_i}" cy="{safe_y_d + (data_y_height / 2)}" r="{data_point_radius_i + (data_point_radius_i / 2)}" stroke="red" stroke-width="{data_point_stroke_width_i}" fill="white"></circle>'
-
-                else:
-                    continue
-
-            else:
-                circle_strings_i = f'<circle cx="{data_x_point_i}" cy="{data_y_point_i}" r="{data_point_radius_i}" stroke="{data_point_stroke_color_i}" stroke-width="{data_point_stroke_width_i}" fill="{data_point_fill_color_i}"></circle>'
-
-            circle_strings.append(circle_strings_i)
-
-        circle_tags = "".join(circle_strings)
+    circle_tags = _build_nanoplot_point_tags(
+        plot_type=plot_type,
+        show_data_points=show_data_points,
+        data_x_points=data_x_points,
+        data_y_points=data_y_points,
+        data_point_radius=data_point_radius,
+        data_point_stroke_color=data_point_stroke_color,
+        data_point_stroke_width=data_point_stroke_width,
+        data_point_fill_color=data_point_fill_color,
+        missing_vals=missing_vals,
+        safe_y_d=safe_y_d,
+        data_y_height=data_y_height,
+    )
 
     #
     # Generate data bars
     #
 
-    if plot_type == "bar" and single_horizontal_plot is False:
+    bar_tags = _build_nanoplot_bar_tags(
+        plot_type=plot_type,
+        single_horizontal_plot=single_horizontal_plot,
+        data_x_points=data_x_points,
+        data_y_points=data_y_points,
+        data_point_radius=data_point_radius,
+        data_bar_stroke_color=data_bar_stroke_color,
+        data_bar_stroke_width=data_bar_stroke_width,
+        data_bar_fill_color=data_bar_fill_color,
+        missing_vals=missing_vals,
+        x_d=x_d,
+        y_vals=y_vals,
+        data_y0_point=data_y0_point,
+        data_bar_negative_stroke_color=data_bar_negative_stroke_color,
+        data_bar_negative_stroke_width=data_bar_negative_stroke_width,
+        data_bar_negative_fill_color=data_bar_negative_fill_color,
+        safe_y_d=safe_y_d,
+        data_y_height=data_y_height,
+    )
+
+    if False and plot_type == "bar" and single_horizontal_plot is False:
         bar_strings = []
 
         for i, (data_x_point_i, data_y_point_i) in enumerate(zip(data_x_points, data_y_points)):
@@ -1595,6 +1570,154 @@ def _generate_nanoplot_impl(
     )
 
     return nanoplot_svg
+
+
+def _build_nanoplot_line_path_tags(
+    plot_type: str,
+    show_data_line: bool,
+    data_line_type: str,
+    n_segments: int,
+    start_data_y_points: list[int],
+    end_data_y_points: list[int],
+    data_x_points: tuple[float, ...],
+    data_y_points: tuple[int | float | None, ...],
+    x_d: int | None,
+    data_line_stroke_color: str,
+    data_line_stroke_width: int,
+) -> str | None:
+    if plot_type != "line" or not show_data_line:
+        return None
+
+    if data_line_type == "curved":
+        data_path_tags = []
+
+        for i in range(n_segments):
+            curve_x = data_x_points[start_data_y_points[i] : end_data_y_points[i]]
+            curve_y = data_y_points[start_data_y_points[i] : end_data_y_points[i]]
+
+            curved_path_string = [f"M {curve_x[0]},{curve_y[0]}"]
+
+            for j in range(1, len(curve_x)):
+                point_b1 = f"{curve_x[j - 1] + x_d / 2},{curve_y[j - 1]}"
+                point_b2 = f"{curve_x[j] - x_d / 2},{curve_y[j]}"
+                point_i = f"{curve_x[j]},{curve_y[j]}"
+
+                curved_path_string.append(f"C {point_b1} {point_b2} {point_i}")
+
+            curved_path_string_i = " ".join(curved_path_string)
+            data_path_tags.append(
+                f'<path d="{curved_path_string_i}" stroke="{data_line_stroke_color}" stroke-width="{data_line_stroke_width}" fill="none"></path>'
+            )
+
+        return "\n".join(data_path_tags)
+
+    data_path_tags = []
+    for i in range(n_segments):
+        line_x = data_x_points[start_data_y_points[i] : end_data_y_points[i]]
+        line_y = data_y_points[start_data_y_points[i] : end_data_y_points[i]]
+
+        line_xy = " ".join((f"{x},{y}" for x, y in zip(line_x, line_y)))
+        data_path_tags.append(
+            f'<polyline points="{line_xy}" stroke="{data_line_stroke_color}" stroke-width="{data_line_stroke_width}" fill="none"></polyline>'
+        )
+
+    return "".join(data_path_tags)
+
+
+def _build_nanoplot_point_tags(
+    plot_type: str,
+    show_data_points: bool,
+    data_x_points: tuple[float, ...],
+    data_y_points: tuple[int | float | None, ...],
+    data_point_radius: list[int],
+    data_point_stroke_color: list[str],
+    data_point_stroke_width: list[int],
+    data_point_fill_color: list[str],
+    missing_vals: str,
+    safe_y_d: int,
+    data_y_height: int,
+) -> str | None:
+    if plot_type != "line" or not show_data_points:
+        return None
+
+    circle_strings = []
+
+    for i, (data_x_point_i, data_y_point_i) in enumerate(zip(data_x_points, data_y_points)):
+        data_point_radius_i = data_point_radius[i]
+        data_point_stroke_color_i = data_point_stroke_color[i]
+        data_point_stroke_width_i = data_point_stroke_width[i]
+        data_point_fill_color_i = data_point_fill_color[i]
+
+        if data_y_point_i is None:
+            if missing_vals == "marker":
+                circle_strings_i = f'<circle cx="{data_x_point_i}" cy="{safe_y_d + (data_y_height / 2)}" r="{data_point_radius_i + (data_point_radius_i / 2)}" stroke="red" stroke-width="{data_point_stroke_width_i}" fill="white"></circle>'
+            else:
+                continue
+        else:
+            circle_strings_i = f'<circle cx="{data_x_point_i}" cy="{data_y_point_i}" r="{data_point_radius_i}" stroke="{data_point_stroke_color_i}" stroke-width="{data_point_stroke_width_i}" fill="{data_point_fill_color_i}"></circle>'
+
+        circle_strings.append(circle_strings_i)
+
+    return "".join(circle_strings)
+
+
+def _build_nanoplot_bar_tags(
+    plot_type: str,
+    single_horizontal_plot: bool,
+    data_x_points: tuple[float, ...],
+    data_y_points: tuple[int | float | None, ...],
+    data_point_radius: list[int],
+    data_bar_stroke_color: list[str],
+    data_bar_stroke_width: list[int],
+    data_bar_fill_color: list[str],
+    missing_vals: str,
+    x_d: int | None,
+    y_vals: list[int] | list[float] | list[int | float],
+    data_y0_point: float | None,
+    data_bar_negative_stroke_color: str,
+    data_bar_negative_stroke_width: int,
+    data_bar_negative_fill_color: str,
+    safe_y_d: int,
+    data_y_height: int,
+) -> str | None:
+    if plot_type != "bar" or single_horizontal_plot:
+        return None
+
+    bar_strings = []
+
+    for i, (data_x_point_i, data_y_point_i) in enumerate(zip(data_x_points, data_y_points)):
+        data_point_radius_i = data_point_radius[i]
+        data_bar_stroke_color_i = data_bar_stroke_color[i]
+        data_bar_stroke_width_i = data_bar_stroke_width[i]
+        data_bar_fill_color_i = data_bar_fill_color[i]
+
+        if data_y_point_i is None:
+            if missing_vals == "marker":
+                bar_strings_i = f'<circle cx="{data_x_point_i}" cy="{safe_y_d + (data_y_height / 2)}" r="{data_point_radius_i + (data_point_radius_i / 2)}" stroke="red" stroke-width="{data_bar_stroke_width_i}" fill="transparent"></circle>'
+            else:
+                continue
+        else:
+            if y_vals[i] < 0:
+                y_value_i = data_y_point_i
+                y_height = data_y_point_i - data_y0_point
+                data_bar_stroke_color_i = data_bar_negative_stroke_color
+                data_bar_stroke_width_i = data_bar_negative_stroke_width
+                data_bar_fill_color_i = data_bar_negative_fill_color
+            elif y_vals[i] > 0:
+                y_value_i = data_y_point_i
+                y_height = data_y0_point - data_y_point_i
+            else:
+                y_value_i = data_y0_point - 1
+                y_height = 2
+                data_bar_stroke_color_i = "#808080"
+                data_bar_stroke_width_i = 4
+                data_bar_fill_color_i = "#808080"
+
+            bar_strings_i = f'<rect x="{data_x_point_i - (x_d - 10) / 2}" y="{y_value_i}" width="{x_d - 10}" height="{y_height}" stroke="{data_bar_stroke_color_i}" stroke-width="{data_bar_stroke_width_i}" fill="{data_bar_fill_color_i}"></rect>'
+
+        bar_strings.append(bar_strings_i)
+
+    return "".join(bar_strings)
 
 
 def _is_intlike(n: Any, scaled_by: float = 1e17) -> bool:
