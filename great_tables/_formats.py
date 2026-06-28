@@ -772,67 +772,23 @@ def fmt_scientific_context(
 
     m_part, n_part = sci_parts
 
-    # Remove trailing zeros and decimal marks from the `m_part`
-    if drop_trailing_zeros:
-        m_part = m_part.rstrip("0")
-    if drop_trailing_dec_mark:
-        m_part = m_part.rstrip(".")
+    m_part = _format_scientific_mantissa(
+        m_part=m_part,
+        is_positive=is_positive,
+        drop_trailing_zeros=drop_trailing_zeros,
+        drop_trailing_dec_mark=drop_trailing_dec_mark,
+        force_sign_m=force_sign_m,
+    )
 
-    # Force the positive sign to be present if the `force_sign_m` option is taken
-    if is_positive and force_sign_m:
-        m_part = "+" + m_part
-
-    if exp_style == "x10n":
-        # Define the exponent string based on the `exp_style` that is the default
-        # ('x10n'); this is styled as 'x 10^n' instead of using a fixed symbol like 'E'
-
-        # Determine which values don't require the (x 10^n) for scientific formatting
-        # since their order would be zero
-        small_pos = _has_sci_order_zero(value=x)
-
-        # Force the positive sign to be present if the `force_sign_n` option is taken
-        if force_sign_n and not _str_detect(n_part, "-"):
-            n_part = "+" + n_part
-
-        # Implement minus sign replacement for `m_part` and `n_part`
-        m_part = _replace_minus(m_part, minus_mark=minus_mark)
-        n_part = _replace_minus(n_part, minus_mark=minus_mark)
-
-        if small_pos:
-            # If the value is small enough to not require the (x 10^n) notation, then
-            # the formatted value is based on only the `m_part`
-            x_formatted = m_part
-        else:
-            # Get the set of exponent marks, which are used to decorate the `n_part`
-            exp_marks = _context_exp_marks(context=context)
-
-            # Create the formatted string based on `exp_marks` and the two `sci_parts`
-            x_formatted = m_part + exp_marks[0] + n_part + exp_marks[1]
-
-    else:
-        # Define the exponent string based on the `exp_style` that's not the default
-        # value of 'x10n'
-
-        exp_str = _context_exp_str(exp_style=exp_style)
-
-        n_min_width = 1 if _str_detect(exp_style, r"^[a-zA-Z]1$") else 2
-
-        # The `n_part` will be extracted here and it must be padded to
-        # the defined minimum number of decimal places
-        if _str_detect(n_part, "-"):
-            n_part = _str_replace(n_part, "-", "")
-            n_part = n_part.rjust(n_min_width, "0")
-            n_part = "-" + n_part
-        else:
-            n_part = n_part.rjust(n_min_width, "0")
-            if force_sign_n:
-                n_part = "+" + n_part
-
-        # Implement minus sign replacement for `m_part` and `n_part`
-        m_part = _replace_minus(m_part, minus_mark=minus_mark)
-        n_part = _replace_minus(n_part, minus_mark=minus_mark)
-
-        x_formatted = m_part + exp_str + n_part
+    x_formatted = _format_scientific_context_value(
+        x=x,
+        m_part=m_part,
+        n_part=n_part,
+        exp_style=exp_style,
+        force_sign_n=force_sign_n,
+        minus_mark=minus_mark,
+        context=context,
+    )
 
     # Use a supplied pattern specification to decorate the formatted value
     if pattern != "{x}":
@@ -4703,6 +4659,87 @@ def _replace_minus(string: str, minus_mark: str) -> str:
         str: The modified string with the minus sign replaced.
     """
     return _str_replace(string, "-", minus_mark)
+
+
+def _format_scientific_mantissa(
+    m_part: str,
+    is_positive: bool,
+    drop_trailing_zeros: bool,
+    drop_trailing_dec_mark: bool,
+    force_sign_m: bool,
+) -> str:
+    if drop_trailing_zeros:
+        m_part = m_part.rstrip("0")
+    if drop_trailing_dec_mark:
+        m_part = m_part.rstrip(".")
+    if is_positive and force_sign_m:
+        m_part = "+" + m_part
+
+    return m_part
+
+
+def _format_scientific_context_value(
+    x: float,
+    m_part: str,
+    n_part: str,
+    exp_style: str,
+    force_sign_n: bool,
+    minus_mark: str,
+    context: str,
+) -> str:
+    if exp_style == "x10n":
+        # Define the exponent string based on the `exp_style` that is the default
+        # ('x10n'); this is styled as 'x 10^n' instead of using a fixed symbol like 'E'
+
+        # Determine which values don't require the (x 10^n) for scientific formatting
+        # since their order would be zero
+        small_pos = _has_sci_order_zero(value=x)
+
+        # Force the positive sign to be present if the `force_sign_n` option is taken
+        if force_sign_n and not _str_detect(n_part, "-"):
+            n_part = "+" + n_part
+
+        # Implement minus sign replacement for `m_part` and `n_part`
+        m_part = _replace_minus(m_part, minus_mark=minus_mark)
+        n_part = _replace_minus(n_part, minus_mark=minus_mark)
+
+        if small_pos:
+            # If the value is small enough to not require the (x 10^n) notation, then
+            # the formatted value is based on only the `m_part`
+            x_formatted = m_part
+        else:
+            # Get the set of exponent marks, which are used to decorate the `n_part`
+            exp_marks = _context_exp_marks(context=context)
+
+            # Create the formatted string based on `exp_marks` and the two `sci_parts`
+            x_formatted = m_part + exp_marks[0] + n_part + exp_marks[1]
+
+    else:
+        # Define the exponent string based on the `exp_style` that's not the default
+        # value of 'x10n'
+
+        exp_str = _context_exp_str(exp_style=exp_style)
+
+        n_min_width = 1 if _str_detect(exp_style, r"^[a-zA-Z]1$") else 2
+
+        # The `n_part` will be extracted here and it must be padded to
+        # the defined minimum number of decimal places
+        if _str_detect(n_part, "-"):
+            n_part = _str_replace(n_part, "-", "")
+            n_part = n_part.rjust(n_min_width, "0")
+            n_part = "-" + n_part
+        else:
+            n_part = n_part.rjust(n_min_width, "0")
+            if force_sign_n:
+                n_part = "+" + n_part
+
+        # Implement minus sign replacement for `m_part` and `n_part`
+        m_part = _replace_minus(m_part, minus_mark=minus_mark)
+        n_part = _replace_minus(n_part, minus_mark=minus_mark)
+
+        x_formatted = m_part + exp_str + n_part
+
+    return x_formatted
 
 
 def _remove_minus(string: str) -> str:
