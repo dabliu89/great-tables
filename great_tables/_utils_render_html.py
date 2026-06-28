@@ -1414,6 +1414,44 @@ def _get_footnote_marks_option(data: GTData) -> str | list[str]:
     return "numbers"
 
 
+def _get_footnote_position_key(
+    data: GTData, fn_info: FootnoteInfo
+) -> tuple[tuple[int | float, int, int], str] | None:
+    if not fn_info.footnotes or fn_info.locname is None:
+        return None
+
+    if not _should_display_footnote(data, fn_info):
+        return None
+
+    footnote_text = _process_text(fn_info.footnotes[0])
+    locnum = _get_summary_locnum(data, fn_info)
+    colnum = _get_footnote_colnum(data, fn_info)
+    rownum = _get_footnote_rownum(fn_info)
+
+    return (locnum, rownum, colnum), footnote_text
+
+
+def _get_footnote_colnum(data: GTData, fn_info: FootnoteInfo) -> int:
+    if isinstance(fn_info.locname, loc.LocRowGroups):
+        return -2  # Row group column is leftmost
+
+    if isinstance(fn_info.locname, (loc.LocStub, loc.LocSummaryStub, loc.LocGrandSummaryStub)):
+        return -1  # Stub appears before data columns but after row group column
+
+    if isinstance(fn_info.locname, loc.LocSpannerLabels):
+        # For spanners, use the leftmost column index to ensure left-to-right ordering
+        return _get_spanner_leftmost_column_index(data, fn_info.grpname)
+
+    return _get_column_index(data, fn_info.colname) if fn_info.colname else 0
+
+
+def _get_footnote_rownum(fn_info: FootnoteInfo) -> int:
+    if isinstance(fn_info.locname, loc.LocColumnLabels):
+        return 0  # Headers are row 0
+
+    return fn_info.rownum if fn_info.rownum is not None else 0
+
+
 def _create_footnote_mark_html(mark: str) -> str:
     # Handle markless footnotes (footnotes added with `locations=None`)
     # These appear in the footer without marks in the table body
@@ -1426,49 +1464,17 @@ def _create_footnote_mark_html(mark: str) -> str:
 
 def _get_footnote_mark_string(data: GTData, footnote_info: FootnoteInfo) -> str:
     if not data._footnotes or not footnote_info.footnotes:
-        mark_type = _get_footnote_marks_option(data)
-        return _generate_footnote_mark(1, mark_type)
+        return _generate_footnote_mark(1, _get_footnote_marks_option(data))
 
     # Create a list of all footnote positions with their text, following R gt approach
     footnote_positions: list[tuple[tuple[int | float, int, int], str]] = []
 
     for fn_info in data._footnotes:
-        if not fn_info.footnotes or fn_info.locname is None:
+        position_key = _get_footnote_position_key(data, fn_info)
+        if position_key is None:
             continue
 
-        # Skip footnotes for hidden columns
-        if not _should_display_footnote(data, fn_info):
-            continue
-
-        footnote_text = _process_text(fn_info.footnotes[0])
-
-        # Assign locnum (location number) based on the location hierarchy where
-        # lower numbers appear first in reading order (summary side-aware)
-        locnum = _get_summary_locnum(data, fn_info)
-
-        # Get colnum (column number) and assign row groups/stub lower values than data columns
-        if isinstance(fn_info.locname, loc.LocRowGroups):
-            colnum = -2  # Row group column is leftmost
-        elif isinstance(
-            fn_info.locname, (loc.LocStub, loc.LocSummaryStub, loc.LocGrandSummaryStub)
-        ):
-            colnum = -1  # Stub appears before data columns but after row group column
-        elif isinstance(fn_info.locname, loc.LocSpannerLabels):
-            # For spanners, use the leftmost column index to ensure left-to-right ordering
-            colnum = _get_spanner_leftmost_column_index(data, fn_info.grpname)
-        else:
-            colnum = _get_column_index(data, fn_info.colname) if fn_info.colname else 0
-
-        # Get rownum; for headers use 0, for body use actual row number
-        if isinstance(fn_info.locname, loc.LocColumnLabels):
-            rownum = 0  # Headers are row 0
-        else:
-            rownum = fn_info.rownum if fn_info.rownum is not None else 0
-
-        # Sort key: (locnum, rownum, colnum); this should match reading order
-        # of top-to-bottom, left-to-right
-        sort_key = (locnum, rownum, colnum)
-        footnote_positions.append((sort_key, footnote_text))
+        footnote_positions.append(position_key)
 
     # Sort by (locnum, rownum, colnum): headers before body
     footnote_positions.sort(key=lambda x: x[0])
@@ -1482,16 +1488,14 @@ def _get_footnote_mark_string(data: GTData, footnote_info: FootnoteInfo) -> str:
     # Find the mark index for this footnote's text
     if footnote_info.footnotes:
         footnote_text = _process_text(footnote_info.footnotes[0])
-        try:
+        mark_type = _get_footnote_marks_option(data)
+        if footnote_text in unique_footnotes:
             mark_index = unique_footnotes.index(footnote_text) + 1  # Use 1-based indexing
-            mark_type = _get_footnote_marks_option(data)
             return _generate_footnote_mark(mark_index, mark_type)
-        except ValueError:
-            mark_type = _get_footnote_marks_option(data)
-            return _generate_footnote_mark(1, mark_type)
 
-    mark_type = _get_footnote_marks_option(data)
-    return _generate_footnote_mark(1, mark_type)
+        return _generate_footnote_mark(1, mark_type)
+
+    return _generate_footnote_mark(1, _get_footnote_marks_option(data))
 
 
 def _get_column_index(data: GTData, colname: str | None) -> int:
