@@ -882,6 +882,149 @@ def _create_group_body_rows_h(
     return body_rows
 
 
+def _create_summary_stub_cells_h(
+    column_vars: list[ColInfo],
+    has_row_stub_column: bool,
+    styles_labels: list[StyleInfo],
+    row_index: int,
+    summary_row: SummaryRowInfo,
+    data: GTData | None,
+    summary_group_id: str | None,
+    css_class: str | None,
+) -> tuple[list[str], list[ColInfo]]:
+    cell_styles = _flatten_styles(
+        [x for x in styles_labels if x.rownum == row_index], wrap=True
+    )
+
+    is_group_summary = summary_group_id is not None
+    summary_css_class = "gt_summary_row" if is_group_summary else "gt_grand_summary_row"
+
+    classes = ["gt_row", "gt_left", "gt_stub", summary_css_class]
+    if css_class:
+        classes.append(css_class)
+    classes_str = " ".join(classes)
+
+    stub_label = summary_row.id
+    if data is not None:
+        if is_group_summary:
+            footnotes_i = [
+                x
+                for x in data._footnotes
+                if isinstance(x.locname, loc.LocSummaryStub)
+                and x.rownum == row_index
+                and x.grpname == summary_group_id
+            ]
+        else:
+            footnotes_i = [
+                x
+                for x in data._footnotes
+                if isinstance(x.locname, loc.LocGrandSummaryStub) and x.rownum == row_index
+            ]
+        stub_label = _apply_footnotes_to_text(footnotes_i, data, stub_label)
+
+    if is_group_summary:
+        # Group summary rows are covered by the group label cell's rowspan,
+        # so we only need a single stub cell for the summary label
+        body_cells = [f'''    <th{cell_styles} class="{classes_str}">{stub_label}</th>''']
+    elif has_row_stub_column:
+        # Grand summary rows are outside any group and need colspan=2
+        # to span across both the group stub column and the row stub column
+        body_cells = [
+            f'''    <th{cell_styles} class="{classes_str}" colspan="2">{stub_label}</th>'''
+        ]
+    else:
+        # Grand summary rows with only group stub column (no row stub)
+        body_cells = [f'''    <th{cell_styles} class="{classes_str}">{stub_label}</th>''']
+
+    # Skip stub columns in column_vars since we've already handled the stub
+    column_vars_to_process = [column for column in column_vars if not column.is_stub]
+
+    return body_cells, column_vars_to_process
+
+
+def _get_row_cell_content_h(
+    colinfo: ColInfo,
+    row_stub_var: ColInfo | None,
+    row_index: int | None,
+    tbl_data: TblData | None,
+    summary_row: SummaryRowInfo | None,
+) -> str:
+    if summary_row is not None:
+        if colinfo == row_stub_var or colinfo.is_stub:
+            return summary_row.id
+
+        return summary_row.values.get(colinfo.var)
+
+    if colinfo.type == ColInfoTypeEnum.summary_placeholder:
+        # TODO: this row is technically a summary row, but summary_row is None here
+        return "&nbsp;"
+
+    return _get_cell(tbl_data, row_index, colinfo.var)
+
+
+def _get_row_cell_footnotes_h(
+    data: GTData | None,
+    colinfo: ColInfo,
+    row_index: int | None,
+    is_summary_row: bool,
+    is_group_summary: bool,
+    summary_group_id: str | None,
+) -> list[FootnoteInfo]:
+    if data is None:
+        return []
+
+    if not is_summary_row:
+        if colinfo.is_stub:
+            # For stub cells, footnotes are stored with colname=None
+            return [
+                x
+                for x in data._footnotes
+                if isinstance(x.locname, loc.LocStub) and x.rownum == row_index
+            ]
+
+        return [
+            x
+            for x in data._footnotes
+            if isinstance(x.locname, loc.LocBody)
+            and x.colname == colinfo.var
+            and x.rownum == row_index
+        ]
+
+    if is_group_summary:
+        if colinfo.is_stub:
+            return [
+                x
+                for x in data._footnotes
+                if isinstance(x.locname, loc.LocSummaryStub)
+                and x.rownum == row_index
+                and x.grpname == summary_group_id
+            ]
+
+        return [
+            x
+            for x in data._footnotes
+            if isinstance(x.locname, loc.LocSummary)
+            and x.colname == colinfo.var
+            and x.rownum == row_index
+            and x.grpname == summary_group_id
+        ]
+
+    if colinfo.is_stub:
+        return [
+            x
+            for x in data._footnotes
+            if isinstance(x.locname, loc.LocGrandSummaryStub) and x.rownum == row_index
+        ]
+
+    return [
+        x
+        for x in data._footnotes
+        if isinstance(x.locname, loc.LocGrandSummary)
+        and x.colname == colinfo.var
+        and x.rownum == row_index
+    ]
+
+
 def _create_row_component_h(
     column_vars: list[ColInfo],
     row_stub_var: ColInfo | None,
@@ -912,67 +1055,30 @@ def _create_row_component_h(
 
     # Handle special cases for summary rows with group stub columns
     if is_summary_row and has_group_stub_column:
-        cell_styles = _flatten_styles(
-            [x for x in styles_labels if x.rownum == row_index], wrap=True
+        stub_cells, column_vars_to_process = _create_summary_stub_cells_h(
+            column_vars=column_vars,
+            has_row_stub_column=has_row_stub_column,
+            styles_labels=styles_labels,
+            row_index=row_index,
+            summary_row=summary_row,
+            data=data,
+            summary_group_id=summary_group_id,
+            css_class=css_class,
         )
-
-        classes = ["gt_row", "gt_left", "gt_stub", summary_css_class]
-        if css_class:
-            classes.append(css_class)
-        classes_str = " ".join(classes)
-
-        # Apply footnotes to the summary stub label
-        stub_label = summary_row.id
-        if data is not None:
-            if is_group_summary:
-                footnotes_i = [
-                    x
-                    for x in data._footnotes
-                    if isinstance(x.locname, loc.LocSummaryStub)
-                    and x.rownum == row_index
-                    and x.grpname == summary_group_id
-                ]
-            else:
-                footnotes_i = [
-                    x
-                    for x in data._footnotes
-                    if isinstance(x.locname, loc.LocGrandSummaryStub) and x.rownum == row_index
-                ]
-            stub_label = _apply_footnotes_to_text(footnotes_i, data, stub_label)
-
-        if is_group_summary:
-            # Group summary rows are covered by the group label cell's rowspan,
-            # so we only need a single stub cell for the summary label
-            body_cells.append(f"""    <th{cell_styles} class="{classes_str}">{stub_label}</th>""")
-        elif has_row_stub_column:
-            # Grand summary rows are outside any group and need colspan=2
-            # to span across both the group stub column and the row stub column
-            body_cells.append(
-                f"""    <th{cell_styles} class="{classes_str}" colspan="2">{stub_label}</th>"""
-            )
-        else:
-            # Grand summary rows with only group stub column (no row stub)
-            body_cells.append(f"""    <th{cell_styles} class="{classes_str}">{stub_label}</th>""")
-
-        # Skip stub columns in column_vars since we've already handled the stub
-        column_vars_to_process = [column for column in column_vars if not column.is_stub]
-
+        body_cells.extend(stub_cells)
     else:
         # Normal case: process all column_vars
         column_vars_to_process = column_vars
 
     for colinfo in column_vars_to_process:
         # Get cell content
-        if is_summary_row:
-            if colinfo == row_stub_var or colinfo.is_stub:
-                cell_content = summary_row.id
-            else:
-                cell_content = summary_row.values.get(colinfo.var)
-        elif colinfo.type == ColInfoTypeEnum.summary_placeholder:
-            # TODO: this row is technically a summary row, but is_summary_row is False here
-            cell_content = "&nbsp;"
-        else:
-            cell_content = _get_cell(tbl_data, row_index, colinfo.var)
+        cell_content = _get_row_cell_content_h(
+            colinfo=colinfo,
+            row_stub_var=row_stub_var,
+            row_index=row_index,
+            tbl_data=tbl_data,
+            summary_row=summary_row,
+        )
 
         if css_class:
             classes = [css_class]
@@ -983,62 +1089,16 @@ def _create_row_component_h(
         cell_alignment = colinfo.defaulted_align
 
         # Apply footnotes to cell content if data is provided
-        if data is not None and not is_summary_row:
-            if colinfo.is_stub:
-                # For stub cells, footnotes are stored with colname=None
-                footnotes_i = [
-                    x
-                    for x in data._footnotes
-                    if isinstance(x.locname, loc.LocStub) and x.rownum == row_index
-                ]
-                cell_str = _apply_footnotes_to_text(footnotes_i, data, cell_str)
-            else:
-                footnotes_i = [
-                    x
-                    for x in data._footnotes
-                    if isinstance(x.locname, loc.LocBody)
-                    and x.colname == colinfo.var
-                    and x.rownum == row_index
-                ]
-                cell_str = _apply_footnotes_to_text(footnotes_i, data, cell_str)
-        elif data is not None and is_summary_row:
-            if is_group_summary:
-                if colinfo.is_stub:
-                    footnotes_i = [
-                        x
-                        for x in data._footnotes
-                        if isinstance(x.locname, loc.LocSummaryStub)
-                        and x.rownum == row_index
-                        and x.grpname == summary_group_id
-                    ]
-                    cell_str = _apply_footnotes_to_text(footnotes_i, data, cell_str)
-                else:
-                    footnotes_i = [
-                        x
-                        for x in data._footnotes
-                        if isinstance(x.locname, loc.LocSummary)
-                        and x.colname == colinfo.var
-                        and x.rownum == row_index
-                        and x.grpname == summary_group_id
-                    ]
-                    cell_str = _apply_footnotes_to_text(footnotes_i, data, cell_str)
-            else:
-                if colinfo.is_stub:
-                    footnotes_i = [
-                        x
-                        for x in data._footnotes
-                        if isinstance(x.locname, loc.LocGrandSummaryStub) and x.rownum == row_index
-                    ]
-                    cell_str = _apply_footnotes_to_text(footnotes_i, data, cell_str)
-                else:
-                    footnotes_i = [
-                        x
-                        for x in data._footnotes
-                        if isinstance(x.locname, loc.LocGrandSummary)
-                        and x.colname == colinfo.var
-                        and x.rownum == row_index
-                    ]
-                    cell_str = _apply_footnotes_to_text(footnotes_i, data, cell_str)
+        footnotes_i = _get_row_cell_footnotes_h(
+            data=data,
+            colinfo=colinfo,
+            row_index=row_index,
+            is_summary_row=is_summary_row,
+            is_group_summary=is_group_summary,
+            summary_group_id=summary_group_id,
+        )
+        if footnotes_i:
+            cell_str = _apply_footnotes_to_text(footnotes_i, data, cell_str)
 
         # Get styles
         _body_styles = [
