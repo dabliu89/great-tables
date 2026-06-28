@@ -638,18 +638,7 @@ def create_body_component_h(data: GTData) -> str:
     has_group_stub_column = "group_label" in stub_layout
     has_groups = data._stub.group_ids is not None and len(data._stub.group_ids) > 0
 
-    # If there is a stub, then prepend that to the `column_vars` list
-    if has_row_stub_column:
-        # There is already a column assigned to the rownames
-        if row_stub_var:
-            column_vars = [row_stub_var] + column_vars
-        # Else we have summary rows but no stub yet
-        else:
-            # TODO: this naming is not ideal
-            summary_row_stub_var = ColInfo(
-                "__do_not_use__", ColInfoTypeEnum.summary_placeholder, column_align="left"
-            )
-            column_vars = [summary_row_stub_var] + column_vars
+    column_vars = _create_body_column_vars_h(column_vars, row_stub_var, has_row_stub_column)
 
     # Is the stub to be striped?
     table_stub_striped = data._options.row_striping_include_stub.value
@@ -678,162 +667,25 @@ def create_body_component_h(data: GTData) -> str:
         )
         body_rows.append(row_html)
 
-    # iterate over rows (ordered by groupings)
-    prev_group_info = None
-
-    ordered_index: list[tuple[int, GroupRowInfo]] = data._stub.group_indices_map()
-
-    for j, (i, group_info) in enumerate(ordered_index):
-        # For table striping we want to add a striping CSS class to the even-numbered
-        # rows in the rendered table; to target these rows, determine if `i` in the current
-        # row render is an odd number
-
-        odd_j_row = j % 2 == 1
-
-        leading_cell = None
-
-        # Create table row or label in the stub specifically for group (if applicable)
-        if has_groups:
-            # Only create if this is the first row of data within the group
-            if group_info is not prev_group_info:
-                group_label = group_info.defaulted_label()
-
-                _styles = [
-                    style
-                    for style in styles_row_group_label
-                    if group_info.group_id in style.grpname
-                ]
-                group_styles = _flatten_styles(_styles, wrap=True)
-
-                # Apply footnote marks to group label
-                footnotes_group = [
-                    x
-                    for x in data._footnotes
-                    if isinstance(x.locname, loc.LocRowGroups) and x.grpname == group_info.group_id
-                ]
-                group_label = _apply_footnotes_to_text(footnotes_group, data, group_label)
-
-                # Get top summary rows for this group (needed for rowspan calculation)
-                top_summary_rows_for_group = (
-                    data._summary_rows.get_summary_rows(group_id=group_info.group_id, side="top")
-                    if data._summary_rows
-                    else []
-                )
-                bottom_summary_rows_for_group = (
-                    data._summary_rows.get_summary_rows(group_id=group_info.group_id, side="bottom")
-                    if data._summary_rows
-                    else []
-                )
-
-                # Add group label that spans multiple columns when row_group_as_column is true
-                if has_group_stub_column:
-                    rowspan_value = (
-                        len(group_info.indices)
-                        + len(top_summary_rows_for_group)
-                        + len(bottom_summary_rows_for_group)
-                    )
-
-                    leading_cell = f"""  <th{group_styles} class="gt_row gt_left gt_stub_row_group"
-    rowspan="{rowspan_value}">{group_label}</th>"""
-
-                # Append a table row for the group heading
-                else:
-                    colspan_value = data._boxhead._get_effective_number_of_columns(
-                        stub=data._stub, has_summary_rows=has_summary_rows, options=data._options
-                    )
-
-                    group_class = (
-                        "gt_empty_group_heading" if group_label == "" else "gt_group_heading_row"
-                    )
-
-                    group_row = f"""  <tr class="{group_class}">
-    <th class="gt_group_heading" colspan="{colspan_value}"{group_styles}>{group_label}</th>
-  </tr>"""
-
-                    body_rows.append(group_row)
-
-                # Render top summary rows immediately after the group heading
-                if data._summary_rows and top_summary_rows_for_group:
-                    for si, summary_row in enumerate(top_summary_rows_for_group):
-                        # Attach leading_cell (group label) to first top summary row
-                        # when row_group_as_column is true
-                        summary_leading = leading_cell if si == 0 else None
-                        row_html = _create_row_component_h(
-                            column_vars=column_vars,
-                            row_stub_var=row_stub_var,
-                            has_row_stub_column=has_row_stub_column,
-                            has_group_stub_column=has_group_stub_column,
-                            leading_cell=summary_leading,
-                            apply_stub_striping=False,
-                            apply_body_striping=False,
-                            styles_cells=styles_summary,
-                            styles_labels=styles_summary_label,
-                            row_index=si,
-                            summary_row=summary_row,
-                            css_class="gt_last_summary_row_top"
-                            if si == len(top_summary_rows_for_group) - 1
-                            else None,
-                            data=data,
-                            summary_group_id=group_info.group_id,
-                            row_class="gt_row_group_first" if si == 0 and leading_cell else None,
-                        )
-                        body_rows.append(row_html)
-
-                    # Clear leading_cell so data row doesn't also get it
-                    if leading_cell:
-                        leading_cell = None
-
-        # Create data row
-        row_html = _create_row_component_h(
+    body_rows.extend(
+        _create_group_body_rows_h(
+            data=data,
             column_vars=column_vars,
             row_stub_var=row_stub_var,
             has_row_stub_column=has_row_stub_column,
             has_group_stub_column=has_group_stub_column,
-            leading_cell=leading_cell,
-            apply_stub_striping=table_stub_striped and odd_j_row,
-            apply_body_striping=table_body_striped and odd_j_row,
+            has_groups=has_groups,
+            has_summary_rows=has_summary_rows,
+            table_stub_striped=table_stub_striped,
+            table_body_striped=table_body_striped,
             styles_cells=styles_cells,
-            styles_labels=styles_row_label,
-            row_index=i,
+            styles_row_label=styles_row_label,
+            styles_row_group_label=styles_row_group_label,
+            styles_summary=styles_summary,
+            styles_summary_label=styles_summary_label,
             tbl_data=tbl_data,
-            data=data,
-            row_class="gt_row_group_first" if leading_cell else None,
         )
-        body_rows.append(row_html)
-
-        prev_group_info = group_info
-
-        # After the last row in the group, append the bottom summary rows
-        if has_groups and group_info is not None and data._summary_rows:
-            # Determine if this is the last row of the current group
-            is_last_in_group = (
-                j == len(ordered_index) - 1 or ordered_index[j + 1][1] is not group_info
-            )
-
-            if is_last_in_group:
-                group_id = group_info.group_id
-
-                # Add bottom summary rows for this group
-                bottom_summary_rows = data._summary_rows.get_summary_rows(
-                    group_id=group_id, side="bottom"
-                )
-                for si, summary_row in enumerate(bottom_summary_rows):
-                    row_html = _create_row_component_h(
-                        column_vars=column_vars,
-                        row_stub_var=row_stub_var,
-                        has_row_stub_column=has_row_stub_column,
-                        has_group_stub_column=has_group_stub_column,
-                        apply_stub_striping=False,
-                        apply_body_striping=False,
-                        styles_cells=styles_summary,
-                        styles_labels=styles_summary_label,
-                        row_index=si,
-                        summary_row=summary_row,
-                        css_class="gt_first_summary_row" if si == 0 else None,
-                        data=data,
-                        summary_group_id=group_id,
-                    )
-                    body_rows.append(row_html)
+    )
 
     # Add grand summary rows at bottom
     bottom_g_summary_rows = data._summary_rows_grand.get_summary_rows(side="bottom")
@@ -859,6 +711,175 @@ def create_body_component_h(data: GTData) -> str:
     return f"""<tbody class="gt_table_body">
 {all_body_rows}
 </tbody>"""
+
+
+def _create_body_column_vars_h(
+    column_vars: list[ColInfo], row_stub_var: ColInfo | None, has_row_stub_column: bool
+) -> list[ColInfo]:
+    if not has_row_stub_column:
+        return column_vars
+
+    if row_stub_var:
+        return [row_stub_var] + column_vars
+
+    summary_row_stub_var = ColInfo(
+        "__do_not_use__", ColInfoTypeEnum.summary_placeholder, column_align="left"
+    )
+    return [summary_row_stub_var] + column_vars
+
+
+def _create_group_body_rows_h(
+    data: GTData,
+    column_vars: list[ColInfo],
+    row_stub_var: ColInfo | None,
+    has_row_stub_column: bool,
+    has_group_stub_column: bool,
+    has_groups: bool,
+    has_summary_rows: bool,
+    table_stub_striped: bool,
+    table_body_striped: bool,
+    styles_cells: list[StyleInfo],
+    styles_row_label: list[StyleInfo],
+    styles_row_group_label: list[StyleInfo],
+    styles_summary: list[StyleInfo],
+    styles_summary_label: list[StyleInfo],
+    tbl_data: TblData,
+) -> list[str]:
+    body_rows: list[str] = []
+    prev_group_info = None
+    ordered_index: list[tuple[int, GroupRowInfo]] = data._stub.group_indices_map()
+
+    for j, (i, group_info) in enumerate(ordered_index):
+        odd_j_row = j % 2 == 1
+        leading_cell = None
+
+        if has_groups and group_info is not prev_group_info:
+            group_label = group_info.defaulted_label()
+
+            _styles = [
+                style
+                for style in styles_row_group_label
+                if group_info.group_id in style.grpname
+            ]
+            group_styles = _flatten_styles(_styles, wrap=True)
+
+            footnotes_group = [
+                x
+                for x in data._footnotes
+                if isinstance(x.locname, loc.LocRowGroups) and x.grpname == group_info.group_id
+            ]
+            group_label = _apply_footnotes_to_text(footnotes_group, data, group_label)
+
+            top_summary_rows_for_group = (
+                data._summary_rows.get_summary_rows(group_id=group_info.group_id, side="top")
+                if data._summary_rows
+                else []
+            )
+            bottom_summary_rows_for_group = (
+                data._summary_rows.get_summary_rows(group_id=group_info.group_id, side="bottom")
+                if data._summary_rows
+                else []
+            )
+
+            if has_group_stub_column:
+                rowspan_value = (
+                    len(group_info.indices)
+                    + len(top_summary_rows_for_group)
+                    + len(bottom_summary_rows_for_group)
+                )
+
+                leading_cell = f"""  <th{group_styles} class="gt_row gt_left gt_stub_row_group"
+    rowspan="{rowspan_value}">{group_label}</th>"""
+            else:
+                colspan_value = data._boxhead._get_effective_number_of_columns(
+                    stub=data._stub, has_summary_rows=has_summary_rows, options=data._options
+                )
+
+                group_class = (
+                    "gt_empty_group_heading" if group_label == "" else "gt_group_heading_row"
+                )
+
+                group_row = f"""  <tr class="{group_class}">
+    <th class="gt_group_heading" colspan="{colspan_value}"{group_styles}>{group_label}</th>
+  </tr>"""
+
+                body_rows.append(group_row)
+
+            if data._summary_rows and top_summary_rows_for_group:
+                for si, summary_row in enumerate(top_summary_rows_for_group):
+                    summary_leading = leading_cell if si == 0 else None
+                    row_html = _create_row_component_h(
+                        column_vars=column_vars,
+                        row_stub_var=row_stub_var,
+                        has_row_stub_column=has_row_stub_column,
+                        has_group_stub_column=has_group_stub_column,
+                        leading_cell=summary_leading,
+                        apply_stub_striping=False,
+                        apply_body_striping=False,
+                        styles_cells=styles_summary,
+                        styles_labels=styles_summary_label,
+                        row_index=si,
+                        summary_row=summary_row,
+                        css_class="gt_last_summary_row_top"
+                        if si == len(top_summary_rows_for_group) - 1
+                        else None,
+                        data=data,
+                        summary_group_id=group_info.group_id,
+                        row_class="gt_row_group_first" if si == 0 and leading_cell else None,
+                    )
+                    body_rows.append(row_html)
+
+                if leading_cell:
+                    leading_cell = None
+
+        row_html = _create_row_component_h(
+            column_vars=column_vars,
+            row_stub_var=row_stub_var,
+            has_row_stub_column=has_row_stub_column,
+            has_group_stub_column=has_group_stub_column,
+            leading_cell=leading_cell,
+            apply_stub_striping=table_stub_striped and odd_j_row,
+            apply_body_striping=table_body_striped and odd_j_row,
+            styles_cells=styles_cells,
+            styles_labels=styles_row_label,
+            row_index=i,
+            tbl_data=tbl_data,
+            data=data,
+            row_class="gt_row_group_first" if leading_cell else None,
+        )
+        body_rows.append(row_html)
+
+        prev_group_info = group_info
+
+        if has_groups and group_info is not None and data._summary_rows:
+            is_last_in_group = (
+                j == len(ordered_index) - 1 or ordered_index[j + 1][1] is not group_info
+            )
+
+            if is_last_in_group:
+                group_id = group_info.group_id
+                bottom_summary_rows = data._summary_rows.get_summary_rows(
+                    group_id=group_id, side="bottom"
+                )
+                for si, summary_row in enumerate(bottom_summary_rows):
+                    row_html = _create_row_component_h(
+                        column_vars=column_vars,
+                        row_stub_var=row_stub_var,
+                        has_row_stub_column=has_row_stub_column,
+                        has_group_stub_column=has_group_stub_column,
+                        apply_stub_striping=False,
+                        apply_body_striping=False,
+                        styles_cells=styles_summary,
+                        styles_labels=styles_summary_label,
+                        row_index=si,
+                        summary_row=summary_row,
+                        css_class="gt_first_summary_row" if si == 0 else None,
+                        data=data,
+                        summary_group_id=group_id,
+                    )
+                    body_rows.append(row_html)
+
+    return body_rows
 
 
 def _create_row_component_h(
