@@ -2660,89 +2660,22 @@ def fmt_duration(
     # Use locale-based marks if a locale ID is provided
     sep_mark = _get_locale_sep_mark(default=sep_mark, use_seps=use_seps, locale=locale)
 
-    # Validate input_units
-    if input_units is not None and input_units not in _DURATION_INPUT_UNITS:
-        raise ValueError(
-            f"`input_units` must be one of {_DURATION_INPUT_UNITS}, got '{input_units}'."
-        )
+    _validate_duration_input_units(input_units=input_units)
+    _validate_duration_style(duration_style=duration_style)
+    resolved_output_units = _resolve_duration_output_units(output_units=output_units)
 
-    # Validate duration_style
-    if duration_style not in ("narrow", "wide", "colon-sep", "iso"):
-        raise ValueError(
-            f"`duration_style` must be one of 'narrow', 'wide', 'colon-sep', or 'iso', "
-            f"got '{duration_style}'."
-        )
-
-    # Resolve output_units
-    if output_units is None:
-        resolved_output_units = list(_DURATION_OUTPUT_UNITS)
-    elif isinstance(output_units, str):
-        resolved_output_units = [output_units]
-    else:
-        resolved_output_units = list(output_units)
-
-    # Validate output_units entries
-    for unit in resolved_output_units:
-        if unit not in _DURATION_OUTPUT_UNITS:
-            raise ValueError(
-                f"Each entry in `output_units` must be one of {_DURATION_OUTPUT_UNITS}, "
-                f"got '{unit}'."
-            )
-
-    # Sort output_units from largest to smallest
-    unit_order = list(_DURATION_OUTPUT_UNITS)
-    resolved_output_units = sorted(resolved_output_units, key=lambda u: unit_order.index(u))
-
-    # Handle colon-sep params
-    colon_sep_output_units: list[str] | None = None
-    colon_sep_trim_leading: bool = False
-
-    if duration_style == "colon-sep":
-        # Check for valid colon-sep output unit combinations
-        valid_colon_combos = [
-            ["minutes", "seconds"],
-            ["hours", "minutes"],
-            ["hours", "minutes", "seconds"],
-            ["days", "hours", "minutes"],
-        ]
-        if resolved_output_units in valid_colon_combos:
-            colon_sep_output_units = resolved_output_units
-        else:
-            colon_sep_output_units = ["days", "hours", "minutes", "seconds"]
-
-        # Override resolved_output_units for the decomposition step
-        resolved_output_units = ["days", "hours", "minutes", "seconds"]
-
-        # Handle trim_zero_units for colon-sep
-        if isinstance(trim_zero_units, list) and trim_zero_units == ["leading"]:
-            colon_sep_trim_leading = True
-        elif trim_zero_units == "leading":
-            colon_sep_trim_leading = True
-
-    if duration_style == "iso":
-        resolved_output_units = ["days", "hours", "minutes", "seconds"]
-        max_output_units = None
-        trim_zero_units = ["leading", "trailing"]
-
-    # Resolve trim_zero_units to a list of keywords
-    if isinstance(trim_zero_units, bool):
-        if trim_zero_units:
-            resolved_trim = ["leading", "trailing", "internal"]
-        else:
-            resolved_trim = []
-    elif isinstance(trim_zero_units, list):
-        for kw in trim_zero_units:
-            if kw not in ("leading", "trailing", "internal"):
-                raise ValueError(
-                    f"Each entry in `trim_zero_units` must be one of 'leading', 'trailing', "
-                    f"or 'internal', got '{kw}'."
-                )
-        resolved_trim = trim_zero_units
-    else:
-        raise ValueError(
-            "`trim_zero_units` must be a bool or a list of keywords "
-            "('leading', 'trailing', 'internal')."
-        )
+    (
+        resolved_output_units,
+        colon_sep_output_units,
+        colon_sep_trim_leading,
+        resolved_trim,
+        max_output_units,
+    ) = _resolve_duration_style_params(
+        duration_style=duration_style,
+        resolved_output_units=resolved_output_units,
+        trim_zero_units=trim_zero_units,
+        max_output_units=max_output_units,
+    )
 
     # Validate max_output_units
     if max_output_units is not None and (
@@ -2767,6 +2700,104 @@ def fmt_duration(
     )
 
     return fmt_by_context(self, pf_format=pf_format, columns=columns, rows=rows)
+
+
+def _validate_duration_input_units(input_units: str | None) -> None:
+    if input_units is not None and input_units not in _DURATION_INPUT_UNITS:
+        raise ValueError(
+            f"`input_units` must be one of {_DURATION_INPUT_UNITS}, got '{input_units}'."
+        )
+
+
+def _validate_duration_style(duration_style: str) -> None:
+    if duration_style not in ("narrow", "wide", "colon-sep", "iso"):
+        raise ValueError(
+            f"`duration_style` must be one of 'narrow', 'wide', 'colon-sep', or 'iso', "
+            f"got '{duration_style}'."
+        )
+
+
+def _resolve_duration_output_units(output_units: str | list[str] | None) -> list[str]:
+    if output_units is None:
+        resolved_output_units = list(_DURATION_OUTPUT_UNITS)
+    elif isinstance(output_units, str):
+        resolved_output_units = [output_units]
+    else:
+        resolved_output_units = list(output_units)
+
+    for unit in resolved_output_units:
+        if unit not in _DURATION_OUTPUT_UNITS:
+            raise ValueError(
+                f"Each entry in `output_units` must be one of {_DURATION_OUTPUT_UNITS}, "
+                f"got '{unit}'."
+            )
+
+    unit_order = list(_DURATION_OUTPUT_UNITS)
+    return sorted(resolved_output_units, key=lambda u: unit_order.index(u))
+
+
+def _resolve_duration_trim_zero_units(trim_zero_units: bool | list[str]) -> list[str]:
+    if isinstance(trim_zero_units, bool):
+        if trim_zero_units:
+            return ["leading", "trailing", "internal"]
+        return []
+
+    if isinstance(trim_zero_units, list):
+        for kw in trim_zero_units:
+            if kw not in ("leading", "trailing", "internal"):
+                raise ValueError(
+                    f"Each entry in `trim_zero_units` must be one of 'leading', 'trailing', "
+                    f"or 'internal', got '{kw}'."
+                )
+        return trim_zero_units
+
+    raise ValueError(
+        "`trim_zero_units` must be a bool or a list of keywords "
+        "('leading', 'trailing', 'internal')."
+    )
+
+
+def _resolve_duration_style_params(
+    duration_style: str,
+    resolved_output_units: list[str],
+    trim_zero_units: bool | list[str],
+    max_output_units: int | None,
+) -> tuple[list[str], list[str] | None, bool, list[str], int | None]:
+    colon_sep_output_units: list[str] | None = None
+    colon_sep_trim_leading = False
+
+    if duration_style == "colon-sep":
+        valid_colon_combos = [
+            ["minutes", "seconds"],
+            ["hours", "minutes"],
+            ["hours", "minutes", "seconds"],
+            ["days", "hours", "minutes"],
+        ]
+        if resolved_output_units in valid_colon_combos:
+            colon_sep_output_units = resolved_output_units
+        else:
+            colon_sep_output_units = ["days", "hours", "minutes", "seconds"]
+
+        resolved_output_units = ["days", "hours", "minutes", "seconds"]
+
+        if isinstance(trim_zero_units, list) and trim_zero_units == ["leading"]:
+            colon_sep_trim_leading = True
+        elif trim_zero_units == "leading":
+            colon_sep_trim_leading = True
+
+    if duration_style == "iso":
+        resolved_output_units = ["days", "hours", "minutes", "seconds"]
+        max_output_units = None
+        trim_zero_units = ["leading", "trailing"]
+
+    resolved_trim = _resolve_duration_trim_zero_units(trim_zero_units=trim_zero_units)
+    return (
+        resolved_output_units,
+        colon_sep_output_units,
+        colon_sep_trim_leading,
+        resolved_trim,
+        max_output_units,
+    )
 
 
 def fmt_duration_context(
