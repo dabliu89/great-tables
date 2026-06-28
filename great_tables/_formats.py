@@ -1037,109 +1037,30 @@ def fmt_engineering_context(
 
     minus_mark = _context_minus_mark(context=context)
 
-    # For engineering notation, we need to calculate the exponent that is a multiple of 3
-    # and adjust the mantissa accordingly
-    if x == 0:
-        # Special case for zero
-        m_part = _value_to_decimal_notation(
-            value=0,
-            decimals=decimals,
-            n_sigfig=n_sigfig,
-            drop_trailing_zeros=drop_trailing_zeros,
-            drop_trailing_dec_mark=drop_trailing_dec_mark,
-            use_seps=False,
-            sep_mark=",",
-            dec_mark=dec_mark,
-            force_sign=False,
-        )
-        n_part = "0"
-        power_3 = 0
-    else:
-        # Calculate the power of 1000 (engineering notation uses multiples of 3)
-        power_3 = int(math.floor(math.log10(abs(x)) / 3) * 3)
-
-        # Calculate the mantissa by dividing by 10^power_3
-        mantissa = x / (10**power_3)
-
-        # Format the mantissa
-        m_part = _value_to_decimal_notation(
-            value=mantissa,
-            decimals=decimals,
-            n_sigfig=n_sigfig,
-            drop_trailing_zeros=drop_trailing_zeros,
-            drop_trailing_dec_mark=drop_trailing_dec_mark,
-            use_seps=False,
-            sep_mark=",",
-            dec_mark=dec_mark,
-            force_sign=False,
-        )
-
-        n_part = str(power_3)
+    m_part, n_part, power_3 = _format_engineering_parts(
+        x=x,
+        decimals=decimals,
+        n_sigfig=n_sigfig,
+        drop_trailing_zeros=drop_trailing_zeros,
+        drop_trailing_dec_mark=drop_trailing_dec_mark,
+        dec_mark=dec_mark,
+    )
 
     # Force the positive sign to be present if the `force_sign_m` option is taken
     if is_positive and force_sign_m:
         m_part = "+" + m_part
 
-    if exp_style == "x10n":
-        # Define the exponent string based on the `exp_style` that is the default
-        # ('x10n'); this is styled as 'x 10^n' instead of using a fixed symbol like 'E'
+    x_formatted = _format_engineering_context_value(
+        m_part=m_part,
+        n_part=n_part,
+        power_3=power_3,
+        exp_style=exp_style,
+        force_sign_n=force_sign_n,
+        minus_mark=minus_mark,
+        context=context,
+    )
 
-        # Determine which values don't require the (x 10^n) for engineering formatting
-        # since their exponent would be zero
-        small_pos = power_3 == 0
-
-        # Force the positive sign to be present if the `force_sign_n` option is taken
-        if force_sign_n and not _str_detect(n_part, "-"):
-            n_part = "+" + n_part
-
-        # Implement minus sign replacement for `m_part` and `n_part`
-        m_part = _replace_minus(m_part, minus_mark=minus_mark)
-        n_part = _replace_minus(n_part, minus_mark=minus_mark)
-
-        if small_pos:
-            # If the exponent is zero, then the formatted value is based on only the `m_part`
-            x_formatted = m_part
-        else:
-            # Get the set of exponent marks, which are used to decorate the `n_part`
-            exp_marks = _context_exp_marks(context=context)
-
-            # Create the formatted string based on `exp_marks` and the two parts
-            x_formatted = m_part + exp_marks[0] + n_part + exp_marks[1]
-
-    else:
-        # Define the exponent string based on the `exp_style` that's not the default
-        # value of 'x10n'
-
-        exp_str = _context_exp_str(exp_style=exp_style)
-
-        n_min_width = 1 if _str_detect(exp_style, r"^[a-zA-Z]1$") else 2
-
-        # The `n_part` will be extracted here and it must be padded to
-        # the defined minimum number of decimal places
-        if _str_detect(n_part, "-"):
-            n_part = _str_replace(n_part, "-", "")
-            n_part = n_part.rjust(n_min_width, "0")
-            n_part = "-" + n_part
-        else:
-            n_part = n_part.rjust(n_min_width, "0")
-            if force_sign_n:
-                n_part = "+" + n_part
-
-        # Implement minus sign replacement for `m_part` and `n_part`
-        m_part = _replace_minus(m_part, minus_mark=minus_mark)
-        n_part = _replace_minus(n_part, minus_mark=minus_mark)
-
-        x_formatted = m_part + exp_str + n_part
-
-    # Use a supplied pattern specification to decorate the formatted value
-    if pattern != "{x}":
-        # Escape LaTeX special characters from literals in the pattern
-        if context == "latex":
-            pattern = escape_pattern_str_latex(pattern_str=pattern)
-
-        x_formatted = pattern.replace("{x}", x_formatted)
-
-    return x_formatted
+    return _format_engineering_pattern(x_formatted=x_formatted, pattern=pattern, context=context)
 
 
 def fmt_percent(
@@ -4738,6 +4659,106 @@ def _format_scientific_context_value(
         n_part = _replace_minus(n_part, minus_mark=minus_mark)
 
         x_formatted = m_part + exp_str + n_part
+
+    return x_formatted
+
+
+def _format_engineering_parts(
+    x: float,
+    decimals: int,
+    n_sigfig: int | None,
+    drop_trailing_zeros: bool,
+    drop_trailing_dec_mark: bool,
+    dec_mark: str,
+) -> tuple[str, str, int]:
+    # For engineering notation, calculate the exponent as a multiple of 3 and
+    # derive the matching mantissa.
+    if x == 0:
+        m_part = _value_to_decimal_notation(
+            value=0,
+            decimals=decimals,
+            n_sigfig=n_sigfig,
+            drop_trailing_zeros=drop_trailing_zeros,
+            drop_trailing_dec_mark=drop_trailing_dec_mark,
+            use_seps=False,
+            sep_mark=",",
+            dec_mark=dec_mark,
+            force_sign=False,
+        )
+        n_part = "0"
+        power_3 = 0
+    else:
+        power_3 = int(math.floor(math.log10(abs(x)) / 3) * 3)
+        mantissa = x / (10**power_3)
+
+        m_part = _value_to_decimal_notation(
+            value=mantissa,
+            decimals=decimals,
+            n_sigfig=n_sigfig,
+            drop_trailing_zeros=drop_trailing_zeros,
+            drop_trailing_dec_mark=drop_trailing_dec_mark,
+            use_seps=False,
+            sep_mark=",",
+            dec_mark=dec_mark,
+            force_sign=False,
+        )
+        n_part = str(power_3)
+
+    return m_part, n_part, power_3
+
+
+def _format_engineering_context_value(
+    m_part: str,
+    n_part: str,
+    power_3: int,
+    exp_style: str,
+    force_sign_n: bool,
+    minus_mark: str,
+    context: str,
+) -> str:
+    if exp_style == "x10n":
+        # Default style: use a rendered x 10^n expression unless the exponent is zero.
+        small_pos = power_3 == 0
+
+        if force_sign_n and not _str_detect(n_part, "-"):
+            n_part = "+" + n_part
+
+        m_part = _replace_minus(m_part, minus_mark=minus_mark)
+        n_part = _replace_minus(n_part, minus_mark=minus_mark)
+
+        if small_pos:
+            x_formatted = m_part
+        else:
+            exp_marks = _context_exp_marks(context=context)
+            x_formatted = m_part + exp_marks[0] + n_part + exp_marks[1]
+
+    else:
+        exp_str = _context_exp_str(exp_style=exp_style)
+        n_min_width = 1 if _str_detect(exp_style, r"^[a-zA-Z]1$") else 2
+
+        if _str_detect(n_part, "-"):
+            n_part = _str_replace(n_part, "-", "")
+            n_part = n_part.rjust(n_min_width, "0")
+            n_part = "-" + n_part
+        else:
+            n_part = n_part.rjust(n_min_width, "0")
+            if force_sign_n:
+                n_part = "+" + n_part
+
+        m_part = _replace_minus(m_part, minus_mark=minus_mark)
+        n_part = _replace_minus(n_part, minus_mark=minus_mark)
+
+        x_formatted = m_part + exp_str + n_part
+
+    return x_formatted
+
+
+def _format_engineering_pattern(x_formatted: str, pattern: str, context: str) -> str:
+    if pattern != "{x}":
+        if context == "latex":
+            pattern = escape_pattern_str_latex(pattern_str=pattern)
+
+        x_formatted = pattern.replace("{x}", x_formatted)
 
     return x_formatted
 
