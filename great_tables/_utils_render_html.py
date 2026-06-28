@@ -1296,77 +1296,53 @@ def _should_display_footnote(data: GTData, footnote: FootnoteInfo) -> bool:
     return True
 
 
-def _process_footnotes_for_display(
-    data: GTData, footnotes: list[FootnoteInfo]
-) -> list[dict[str, str]]:
-    if not footnotes:
-        return []
+def _get_footnote_display_sort_key(data: GTData, fn_info: FootnoteInfo) -> tuple[int | float, int, int]:
+    # Match the reading order used by footnote marks in the table body.
+    locnum = _get_summary_locnum(data, fn_info)
 
-    # Filter out footnotes for hidden columns
-    visible_footnotes = [f for f in footnotes if _should_display_footnote(data, f)]
+    if isinstance(fn_info.locname, loc.LocRowGroups):
+        colnum = -2  # Row group column is leftmost
+    elif isinstance(fn_info.locname, (loc.LocStub, loc.LocSummaryStub, loc.LocGrandSummaryStub)):
+        colnum = -1  # Stub appears before data columns but after row group column
+    else:
+        colnum = _get_column_index(data, fn_info.colname) if fn_info.colname else 0
 
-    # Sort footnotes by visual order (same logic as in _get_footnote_mark_string);
-    # this ensures footnotes appear in the footnotes section in the same order as their
-    # marks in the table
+    rownum = 0 if isinstance(fn_info.locname, loc.LocColumnLabels) else (fn_info.rownum or 0)
+    return (locnum, rownum, colnum)
+
+
+def _build_footnotes_for_display(data: GTData, visible_footnotes: list[FootnoteInfo]) -> list[dict[str, str]]:
     footnote_positions: list[tuple[tuple[int | float, int, int], FootnoteInfo]] = []
 
     for fn_info in visible_footnotes:
         if fn_info.locname is None:
             continue
 
-        # Assign locnum based on visual hierarchy (summary side-aware)
-        locnum = _get_summary_locnum(data, fn_info)
+        footnote_positions.append((_get_footnote_display_sort_key(data, fn_info), fn_info))
 
-        # Assign column number, with row groups and stub getting lower values than data columns
-        if isinstance(fn_info.locname, loc.LocRowGroups):
-            colnum = -2  # Row group column is leftmost
-        elif isinstance(
-            fn_info.locname, (loc.LocStub, loc.LocSummaryStub, loc.LocGrandSummaryStub)
-        ):
-            colnum = -1  # Stub appears before data columns but after row group column
-        else:
-            colnum = _get_column_index(data, fn_info.colname) if fn_info.colname else 0
-        rownum = (
-            0
-            if isinstance(fn_info.locname, loc.LocColumnLabels)
-            else (fn_info.rownum if fn_info.rownum is not None else 0)
-        )
-
-        sort_key = (locnum, rownum, colnum)
-        footnote_positions.append((sort_key, fn_info))
-
-    # Sort by visual order
     footnote_positions.sort(key=lambda x: x[0])
     sorted_footnotes = [fn_info for _, fn_info in footnote_positions]
 
-    # Group footnotes by their text to avoid duplicates and get their marks
+    # Group footnotes by their text to avoid duplicates and get their marks.
     footnote_data: dict[str, str] = {}  # text -> mark_string
     footnote_order: list[str] = []
 
     for footnote in sorted_footnotes:
         if footnote.footnotes:
-            footnote_text = footnote.footnotes[0] if footnote.footnotes else ""
+            footnote_text = footnote.footnotes[0]
             if footnote_text not in footnote_data:
-                mark_string = _get_footnote_mark_string(data, footnote)
-                footnote_data[footnote_text] = mark_string
+                footnote_data[footnote_text] = _get_footnote_mark_string(data, footnote)
                 footnote_order.append(footnote_text)
 
-    # Add footnotes without marks at the beginning (also filter for visibility)
-    markless_footnotes = [f for f in visible_footnotes if f.locname is None]  # type: ignore
     result: list[dict[str, str]] = []
 
-    # Add markless footnotes first
-    for footnote in markless_footnotes:
-        if footnote.footnotes:
-            footnote_text = footnote.footnotes[0]
-            result.append({"mark": "", "text": footnote_text})
+    # Add markless footnotes first.
+    for footnote in visible_footnotes:
+        if footnote.locname is None and footnote.footnotes:
+            result.append({"mark": "", "text": footnote.footnotes[0]})
 
-    # Add footnotes with marks and maintain visual order (order they appear in table);
-    # the `footnote_order` list already contains footnotes in visual order based on how
-    # `_get_footnote_mark_string()` assigns marks
     mark_type = _get_footnote_marks_option(data)
     if isinstance(mark_type, str) and mark_type == "numbers":
-        # For numbers, sort by numeric mark value to handle any edge cases
         sorted_texts = sorted(
             footnote_order,
             key=lambda text: (
@@ -1374,14 +1350,20 @@ def _process_footnotes_for_display(
             ),
         )
     else:
-        # For letters/symbols, maintain visual order (don't sort alphabetically)
         sorted_texts = footnote_order
 
     for text in sorted_texts:
-        mark_string = footnote_data[text]
-        result.append({"mark": mark_string, "text": text})
+        result.append({"mark": footnote_data[text], "text": text})
 
     return result
+
+
+def _process_footnotes_for_display(
+    data: GTData, footnotes: list[FootnoteInfo]
+) -> list[dict[str, str]]:
+    # Filter out footnotes for hidden columns
+    visible_footnotes = [f for f in footnotes if _should_display_footnote(data, f)]
+    return _build_footnotes_for_display(data, visible_footnotes)
 
 
 def _get_footnote_mark_symbols() -> dict[str, list[str]]:
