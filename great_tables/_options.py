@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import warnings
-from dataclasses import dataclass, fields, replace
-from typing import TYPE_CHECKING, ClassVar, Iterable, cast
+from dataclasses import replace
+from typing import TYPE_CHECKING, Iterable, cast
 
 from . import _utils
 from ._helpers import FontStackName, GoogleFont, _intify_scaled_px, px
@@ -578,7 +578,7 @@ def tab_options(
         validated_value = opt_info._validate_value(v, option_name=k)
         new_options_info[k] = replace(opt_info, value=validated_value)
 
-    new_options = replace(self._options, **new_options_info)
+    new_options = self._options._replace(**new_options_info)
 
     return self._replace(_options=new_options)
 
@@ -1492,7 +1492,7 @@ def opt_stylize(
 
     params = dict_omit_keys(dict=params, omit_keys=omit_keys)
 
-    mapped_params = StyleMapper(**params).map_all()
+    mapped_params = map_style_params(params)
 
     # Add the `add_row_striping` parameter to the `mapped_params` dictionary
     if add_row_striping:
@@ -1615,54 +1615,37 @@ def opt_css(
     return res
 
 
-@dataclass
-class StyleMapper:
-    table_hlines_color: str
-    location_hlines_color: str
-    column_labels_background_color: str
-    stub_background_color: str
-    stub_border_style: str
-    stub_border_color: str
-    data_hlines_style: str
-    data_hlines_color: str
-    data_vlines_style: str
-    data_vlines_color: str
-    row_striping_background_color: str
-    grand_summary_row_background_color: str
-    # summary_row_background_color: str
+STYLE_MAPPINGS: dict[str, list[str]] = {
+    "table_hlines_color": ["table_border_top_color", "table_border_bottom_color"],
+    "location_hlines_color": [
+        "heading_border_bottom_color",
+        "column_labels_border_top_color",
+        "column_labels_border_bottom_color",
+        "row_group_border_top_color",
+        "row_group_border_bottom_color",
+        "table_body_border_top_color",
+        "table_body_border_bottom_color",
+    ],
+    "column_labels_background_color": ["column_labels_background_color"],
+    "stub_background_color": ["stub_background_color"],
+    "stub_border_style": ["stub_border_style"],
+    "stub_border_color": ["stub_border_color"],
+    "data_hlines_style": ["table_body_hlines_style"],
+    "data_hlines_color": ["table_body_hlines_color"],
+    "data_vlines_style": ["table_body_vlines_style"],
+    "data_vlines_color": ["table_body_vlines_color"],
+    "row_striping_background_color": ["row_striping_background_color"],
+    "grand_summary_row_background_color": ["grand_summary_row_background_color"],
+    # "summary_row_background_color": ["summary_row_background_color"],
+}
 
-    mappings: ClassVar[dict[str, list[str]]] = {
-        "table_hlines_color": ["table_border_top_color", "table_border_bottom_color"],
-        "location_hlines_color": [
-            "heading_border_bottom_color",
-            "column_labels_border_top_color",
-            "column_labels_border_bottom_color",
-            "row_group_border_top_color",
-            "row_group_border_bottom_color",
-            "table_body_border_top_color",
-            "table_body_border_bottom_color",
-        ],
-        "column_labels_background_color": ["column_labels_background_color"],
-        "stub_background_color": ["stub_background_color"],
-        "stub_border_style": ["stub_border_style"],
-        "stub_border_color": ["stub_border_color"],
-        "data_hlines_style": ["table_body_hlines_style"],
-        "data_hlines_color": ["table_body_hlines_color"],
-        "data_vlines_style": ["table_body_vlines_style"],
-        "data_vlines_color": ["table_body_vlines_color"],
-        "row_striping_background_color": ["row_striping_background_color"],
-        "grand_summary_row_background_color": ["grand_summary_row_background_color"],
-        # "summary_row_background_color": ["summary_row_background_color"],
+
+def map_style_params(params: dict[str, str]) -> dict[str, str]:
+    return {
+        target: params[source]
+        for source, targets in STYLE_MAPPINGS.items()
+        for target in targets
     }
-
-    def map_entry(self, name: str) -> dict[str, list[str]]:
-        return {k: getattr(self, name) for k in self.mappings[name]}
-
-    def map_all(self) -> dict[str, list[str]]:
-        items: dict[str, list[str]] = {}
-        for field in fields(self):
-            items.update(self.map_entry(field.name))
-        return items
 
 
 _dict_styles_colors_params = {

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime, time
 from decimal import Decimal
 from functools import partial
@@ -5903,15 +5903,21 @@ def fmt_icon(
 
     formatter = FmtIcon(
         self._tbl_data,
-        height=height,
         sep=sep,
-        stroke_color=stroke_color,
-        stroke_width=stroke_width,
-        stroke_alpha=stroke_alpha,
-        fill_color=fill_color,
-        fill_alpha=fill_alpha,
-        margin_left=margin_left,
-        margin_right=margin_right,
+        config=FmtIconConfig(
+            height=height,
+            style=FmtIconStyleConfig(
+                stroke_color=stroke_color,
+                stroke_width=stroke_width,
+                stroke_alpha=stroke_alpha,
+                fill_color=fill_color,
+                fill_alpha=fill_alpha,
+            ),
+            margins=FmtIconMarginConfig(
+                margin_left=margin_left,
+                margin_right=margin_right,
+            ),
+        ),
     )
 
     return fmt(
@@ -5923,17 +5929,32 @@ def fmt_icon(
 
 
 @dataclass
-class FmtIcon:
-    dispatch_on: DataFrameLike | Agnostic = Agnostic()
-    height: str | None = None
-    sep: str = " "
+class FmtIconStyleConfig:
     stroke_color: str | None = None
     stroke_width: str | int | float | None = None
     stroke_alpha: float | None = None
     fill_color: str | dict[str, str] | None = None
     fill_alpha: float | None = None
+
+
+@dataclass
+class FmtIconMarginConfig:
     margin_left: str | None = None
     margin_right: str | None = None
+
+
+@dataclass
+class FmtIconConfig:
+    height: str | None = None
+    style: FmtIconStyleConfig = field(default_factory=FmtIconStyleConfig)
+    margins: FmtIconMarginConfig = field(default_factory=FmtIconMarginConfig)
+
+
+@dataclass
+class FmtIcon:
+    dispatch_on: DataFrameLike | Agnostic = Agnostic()
+    sep: str = " "
+    config: FmtIconConfig = field(default_factory=FmtIconConfig)
 
     SPAN_TEMPLATE: ClassVar = '<span style="white-space:nowrap;">{}</span>'
 
@@ -5944,25 +5965,25 @@ class FmtIcon:
         return [val]
 
     def _resolve_height(self) -> str:
-        if self.height is None:
+        if self.config.height is None:
             return "1em"
 
-        return self.height
+        return self.config.height
 
     def _resolve_stroke_width(self) -> str:
-        if self.stroke_width is None:
+        if self.config.style.stroke_width is None:
             return "1px"
 
-        if isinstance(self.stroke_width, (int, float)):
-            return f"{self.stroke_width}px"
+        if isinstance(self.config.style.stroke_width, (int, float)):
+            return f"{self.config.style.stroke_width}px"
 
-        return self.stroke_width
+        return self.config.style.stroke_width
 
     def _resolve_fill_color(self, icon: str) -> str | None:
-        if isinstance(self.fill_color, dict):
-            return self.fill_color.get(icon)
+        if isinstance(self.config.style.fill_color, dict):
+            return self.config.style.fill_color.get(icon)
 
-        return self.fill_color
+        return self.config.style.fill_color
 
     def to_html(self, val: Any):
         if is_na(self.dispatch_on, val):
@@ -5978,13 +5999,13 @@ class FmtIcon:
             icon_svg = faicons.icon_svg(
                 icon,
                 height=height,
-                stroke=self.stroke_color,
+                stroke=self.config.style.stroke_color,
                 stroke_width=stroke_width,
-                stroke_opacity=str(self.stroke_alpha),
+                stroke_opacity=str(self.config.style.stroke_alpha),
                 fill=self._resolve_fill_color(icon),
-                fill_opacity=str(self.fill_alpha),
-                margin_left=self.margin_left,
-                margin_right=self.margin_right,
+                fill_opacity=str(self.config.style.fill_alpha),
+                margin_left=self.config.margins.margin_left,
+                margin_right=self.config.margins.margin_right,
             )
 
             out.append(str(icon_svg))
@@ -6542,10 +6563,148 @@ def fmt_nanoplot(
     ```
     """
 
-    from great_tables._utils import _str_detect
+    _validate_nanoplot_args(columns, plot_type)
 
-    # guards ----
+    data_tbl = self._tbl_data
+    scalar_vals = _is_scalar_nanoplot_column(data_tbl, columns)
 
+    if plot_type in ("line", "bar") and scalar_vals:
+        all_single_y_vals = _get_nanoplot_values(data_tbl, columns, rows)
+        autoscale = False
+    else:
+        all_single_y_vals = None
+
+    options_plots = _resolve_nanoplot_options(options)
+
+    if autoscale:
+        expand_y = _compute_nanoplot_expand_y(data_tbl, columns, rows)
+
+    fmt_nanoplot_fn = partial(
+        _fmt_nanoplot_cell,
+        data_tbl=data_tbl,
+        plot_type=plot_type,
+        plot_height=plot_height,
+        missing_vals=missing_vals,
+        reference_line=reference_line,
+        reference_area=reference_area,
+        expand_x=expand_x,
+        expand_y=expand_y,
+        all_single_y_vals=all_single_y_vals,
+        options_plots=options_plots,
+    )
+
+    return fmt_by_context(self, pf_format=fmt_nanoplot_fn, columns=columns, rows=rows)
+
+
+def _is_scalar_nanoplot_column(data_tbl: DataFrameLike, columns: str) -> bool:
+    column_d_type = _get_column_dtype(data_tbl, columns)
+    col_class = str(column_d_type).lower()
+
+    return any(_str_detect(col_class, pattern) for pattern in ("int", "uint", "float"))
+
+
+def _get_nanoplot_values(
+    data_tbl: DataFrameLike,
+    columns: str,
+    rows: int | list[int] | None,
+) -> list[Any]:
+    if rows is not None:
+        return to_list(data_tbl[columns][rows])
+
+    return to_list(data_tbl[columns])
+
+
+def _resolve_nanoplot_options(options: dict[str, Any] | None) -> dict[str, Any]:
+    if options is None:
+        from great_tables._helpers import nanoplot_options
+
+        return nanoplot_options()
+
+    return options
+
+
+def _compute_nanoplot_expand_y(
+    data_tbl: DataFrameLike,
+    columns: str,
+    rows: int | list[int] | None,
+) -> list[int | float]:
+    from great_tables._utils import _flatten_list
+
+    all_y_vals_raw = _get_nanoplot_values(data_tbl, columns, rows)
+    all_y_vals: list[int | float] = []
+
+    for data_vals_i in all_y_vals_raw:
+        if isinstance(data_vals_i, dict):
+            if len(data_vals_i) == 1:
+                data_vals_i = list(data_vals_i.values())[0]
+            else:
+                data_vals_i = data_vals_i["y"]
+
+        data_vals_i = _generate_data_vals(data_vals=data_vals_i)
+
+        if not isinstance(data_vals_i, list):
+            data_vals_i = [data_vals_i]
+
+        all_y_vals.extend(data_vals_i)
+
+    all_y_vals = _flatten_list(all_y_vals)
+    return [min(all_y_vals), max(all_y_vals)]
+
+
+def _fmt_nanoplot_cell(
+    x: Any,
+    context: str,
+    data_tbl: DataFrameLike,
+    plot_type: PlotType,
+    plot_height: str,
+    missing_vals: MissingVals,
+    reference_line: str | int | float | None,
+    reference_area: list[Any] | None,
+    expand_x: list[int] | list[float] | list[int | float] | None,
+    expand_y: list[int] | list[float] | list[int | float] | None,
+    all_single_y_vals: list[int | float] | None,
+    options_plots: dict[str, Any],
+) -> str:
+    if context == "latex":
+        raise NotImplementedError("fmt_nanoplot() is not supported in LaTeX.")
+
+    if is_na(data_tbl, x):
+        return x
+
+    x = _generate_data_vals(data_vals=x)
+
+    if isinstance(x, tuple):
+        x_vals, y_vals = x
+
+        if not isinstance(x_vals, list) or not isinstance(y_vals, list):
+            raise ValueError("The 'x' and 'y' values must be lists.")
+
+        if not all(isinstance(val, (int, float)) for val in x_vals):
+            raise ValueError("The 'x' values must be numeric.")
+
+        if len(x_vals) != len(y_vals):
+            raise ValueError("The lengths of the 'x' and 'y' values must be the same.")
+
+    else:
+        y_vals = x
+        x_vals = None
+
+    return _generate_nanoplot(
+        y_vals=y_vals,
+        y_ref_line=reference_line,
+        y_ref_area=reference_area,
+        x_vals=x_vals,
+        expand_x=expand_x,
+        expand_y=expand_y,
+        missing_vals=missing_vals,
+        all_single_y_vals=all_single_y_vals,
+        plot_type=plot_type,
+        svg_height=plot_height,
+        **options_plots,
+    )
+
+
+def _validate_nanoplot_args(columns: str | None, plot_type: PlotType) -> None:
     if not isinstance(columns, str):
         raise NotImplementedError(
             "Currently, fmt_nanoplot() only supports a single column name as a string. "
@@ -6558,70 +6717,6 @@ def fmt_nanoplot(
             f"\n\n Received: {plot_type}"
         )
 
-    # main ----
-    # Get the internal data table
-    data_tbl = self._tbl_data
-
-    column_d_type = _get_column_dtype(data_tbl, columns)
-
-    col_class = str(column_d_type).lower()
-
-    if (
-        _str_detect(col_class, "int")
-        or _str_detect(col_class, "uint")
-        or _str_detect(col_class, "float")
-    ):
-        scalar_vals = True
-    else:
-        scalar_vals = False
-
-    # If a bar plot is requested and the data consists of single y values, then we need to
-    # obtain a list of all single y values in the targeted column (from `columns`)
-    if plot_type in ("line", "bar") and scalar_vals:
-        # Check each cell in the column and get each of them that contains a scalar value
-        # Why are we grabbing the first element of a tuple? (Note this also happens again below.)
-        if rows is not None:
-            all_single_y_vals = to_list(data_tbl[columns][rows])
-        else:
-            all_single_y_vals = to_list(data_tbl[columns])
-
-        autoscale = False
-
-    else:
-        all_single_y_vals = None
-
-    if options is None:
-        from great_tables._helpers import nanoplot_options
-
-        options_plots = nanoplot_options()
-    else:
-        options_plots = options
-
-    # For autoscale, we need to get the minimum and maximum from all values for the y-axis
-    if autoscale:
-        # TODO: if a column of delimiter separated strings is passed. E.g. "1 2 3 4". Does this mean
-        # that autoscale does not work? In this case, is col_i_y_vals_raw a string that gets processed?
-        # downstream?
-        expand_y = _fmt_nanoplot_expand_y(data_tbl=data_tbl, columns=columns, rows=rows)
-
-    return fmt_by_context(
-        self,
-        pf_format=partial(
-            _fmt_nanoplot_fn,
-            data_tbl=data_tbl,
-            plot_type=plot_type,
-            plot_height=plot_height,
-            missing_vals=missing_vals,
-            reference_line=reference_line,
-            reference_area=reference_area,
-            expand_x=expand_x,
-            expand_y=expand_y,
-            all_single_y_vals=all_single_y_vals,
-            options_plots=options_plots,
-        ),
-        columns=columns,
-        rows=rows,
-    )
 
 
 def _generate_data_vals(
