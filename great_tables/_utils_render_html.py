@@ -637,9 +637,7 @@ def create_body_component_h(data: GTData) -> str:
 
 
 @dataclass
-class _BodyComponentContextH:
-    data: GTData
-    tbl_data: TblData
+class _BodyComponentStylesContextH:
     styles_row_group_label: list[StyleInfo]
     styles_row_label: list[StyleInfo]
     styles_summary_label: list[StyleInfo]
@@ -647,14 +645,25 @@ class _BodyComponentContextH:
     styles_cells: list[StyleInfo]
     styles_summary: list[StyleInfo]
     styles_grand_summary: list[StyleInfo]
+
+
+@dataclass
+class _BodyComponentLayoutContextH:
     column_vars: list[ColInfo]
     row_stub_var: ColInfo | None
-    has_summary_rows: bool
     has_row_stub_column: bool
     has_group_stub_column: bool
     has_groups: bool
     table_stub_striped: bool
     table_body_striped: bool
+
+
+@dataclass
+class _BodyComponentContextH:
+    data: GTData
+    tbl_data: TblData
+    styles: _BodyComponentStylesContextH
+    layout: _BodyComponentLayoutContextH
 
 
 def _prepare_body_component_h(data: GTData) -> _BodyComponentContextH:
@@ -713,21 +722,24 @@ def _prepare_body_component_h(data: GTData) -> _BodyComponentContextH:
     return _BodyComponentContextH(
         data=data,
         tbl_data=tbl_data,
-        styles_row_group_label=styles_row_group_label,
-        styles_row_label=styles_row_label,
-        styles_summary_label=styles_summary_label,
-        styles_grand_summary_label=styles_grand_summary_label,
-        styles_cells=styles_cells,
-        styles_summary=styles_summary,
-        styles_grand_summary=styles_grand_summary,
-        column_vars=column_vars,
-        row_stub_var=row_stub_var,
-        has_summary_rows=has_summary_rows,
-        has_row_stub_column=has_row_stub_column,
-        has_group_stub_column=has_group_stub_column,
-        has_groups=has_groups,
-        table_stub_striped=table_stub_striped,
-        table_body_striped=table_body_striped,
+        styles=_BodyComponentStylesContextH(
+            styles_row_group_label=styles_row_group_label,
+            styles_row_label=styles_row_label,
+            styles_summary_label=styles_summary_label,
+            styles_grand_summary_label=styles_grand_summary_label,
+            styles_cells=styles_cells,
+            styles_summary=styles_summary,
+            styles_grand_summary=styles_grand_summary,
+        ),
+        layout=_BodyComponentLayoutContextH(
+            column_vars=column_vars,
+            row_stub_var=row_stub_var,
+            has_row_stub_column=has_row_stub_column,
+            has_group_stub_column=has_group_stub_column,
+            has_groups=has_groups,
+            table_stub_striped=table_stub_striped,
+            table_body_striped=table_body_striped,
+        ),
     )
 
 
@@ -742,14 +754,14 @@ def _create_grand_summary_rows_h(
 
     for i, summary_row in enumerate(grand_summary_rows):
         row_html = _create_row_component_h(
-            column_vars=ctx.column_vars,
-            row_stub_var=ctx.row_stub_var,
-            has_row_stub_column=ctx.has_row_stub_column,
-            has_group_stub_column=ctx.has_group_stub_column,
+            column_vars=ctx.layout.column_vars,
+            row_stub_var=ctx.layout.row_stub_var,
+            has_row_stub_column=ctx.layout.has_row_stub_column,
+            has_group_stub_column=ctx.layout.has_group_stub_column,
             apply_stub_striping=False,
             apply_body_striping=False,
-            styles_cells=ctx.styles_grand_summary,
-            styles_labels=ctx.styles_grand_summary_label,
+            styles_cells=ctx.styles.styles_grand_summary,
+            styles_labels=ctx.styles.styles_grand_summary_label,
             row_index=i if side == "top" else i + top_row_count,
             summary_row=summary_row,
             css_class="gt_last_grand_summary_row_top"
@@ -766,6 +778,7 @@ def _create_group_body_rows_h(
     ctx: _BodyComponentContextH,
 ) -> list[str]:
     body_rows: list[str] = []
+    has_summary_rows = bool(ctx.data._summary_rows or ctx.data._summary_rows_grand)
 
     # iterate over rows (ordered by groupings)
     prev_group_info = None
@@ -782,14 +795,14 @@ def _create_group_body_rows_h(
         leading_cell = None
 
         # Create table row or label in the stub specifically for group (if applicable)
-        if ctx.has_groups:
+        if ctx.layout.has_groups:
             # Only create if this is the first row of data within the group
             if group_info is not prev_group_info:
                 group_label = group_info.defaulted_label()
 
                 _styles = [
                     style
-                    for style in ctx.styles_row_group_label
+                    for style in ctx.styles.styles_row_group_label
                     if group_info.group_id in style.grpname
                 ]
                 group_styles = _flatten_styles(_styles, wrap=True)
@@ -815,7 +828,7 @@ def _create_group_body_rows_h(
                 )
 
                 # Add group label that spans multiple columns when row_group_as_column is true
-                if ctx.has_group_stub_column:
+                if ctx.layout.has_group_stub_column:
                     rowspan_value = (
                         len(group_info.indices)
                         + len(top_summary_rows_for_group)
@@ -828,7 +841,9 @@ def _create_group_body_rows_h(
                 # Append a table row for the group heading
                 else:
                     colspan_value = ctx.data._boxhead._get_effective_number_of_columns(
-                        stub=ctx.data._stub, has_summary_rows=ctx.has_summary_rows, options=ctx.data._options
+                        stub=ctx.data._stub,
+                        has_summary_rows=has_summary_rows,
+                        options=ctx.data._options,
                     )
 
                     group_class = (
@@ -848,15 +863,15 @@ def _create_group_body_rows_h(
                         # when row_group_as_column is true
                         summary_leading = leading_cell if si == 0 else None
                         row_html = _create_row_component_h(
-                            column_vars=ctx.column_vars,
-                            row_stub_var=ctx.row_stub_var,
-                            has_row_stub_column=ctx.has_row_stub_column,
-                            has_group_stub_column=ctx.has_group_stub_column,
+                            column_vars=ctx.layout.column_vars,
+                            row_stub_var=ctx.layout.row_stub_var,
+                            has_row_stub_column=ctx.layout.has_row_stub_column,
+                            has_group_stub_column=ctx.layout.has_group_stub_column,
                             leading_cell=summary_leading,
                             apply_stub_striping=False,
                             apply_body_striping=False,
-                            styles_cells=ctx.styles_summary,
-                            styles_labels=ctx.styles_summary_label,
+                            styles_cells=ctx.styles.styles_summary,
+                            styles_labels=ctx.styles.styles_summary_label,
                             row_index=si,
                             summary_row=summary_row,
                             css_class="gt_last_summary_row_top"
@@ -874,15 +889,15 @@ def _create_group_body_rows_h(
 
         # Create data row
         row_html = _create_row_component_h(
-            column_vars=ctx.column_vars,
-            row_stub_var=ctx.row_stub_var,
-            has_row_stub_column=ctx.has_row_stub_column,
-            has_group_stub_column=ctx.has_group_stub_column,
+            column_vars=ctx.layout.column_vars,
+            row_stub_var=ctx.layout.row_stub_var,
+            has_row_stub_column=ctx.layout.has_row_stub_column,
+            has_group_stub_column=ctx.layout.has_group_stub_column,
             leading_cell=leading_cell,
-            apply_stub_striping=ctx.table_stub_striped and odd_j_row,
-            apply_body_striping=ctx.table_body_striped and odd_j_row,
-            styles_cells=ctx.styles_cells,
-            styles_labels=ctx.styles_row_label,
+            apply_stub_striping=ctx.layout.table_stub_striped and odd_j_row,
+            apply_body_striping=ctx.layout.table_body_striped and odd_j_row,
+            styles_cells=ctx.styles.styles_cells,
+            styles_labels=ctx.styles.styles_row_label,
             row_index=i,
             tbl_data=ctx.tbl_data,
             data=ctx.data,
@@ -893,7 +908,7 @@ def _create_group_body_rows_h(
         prev_group_info = group_info
 
         # After the last row in the group, append the bottom summary rows
-        if ctx.has_groups and group_info is not None and ctx.data._summary_rows:
+        if ctx.layout.has_groups and group_info is not None and ctx.data._summary_rows:
             # Determine if this is the last row of the current group
             is_last_in_group = (
                 j == len(ordered_index) - 1 or ordered_index[j + 1][1] is not group_info
@@ -908,14 +923,14 @@ def _create_group_body_rows_h(
                 )
                 for si, summary_row in enumerate(bottom_summary_rows):
                     row_html = _create_row_component_h(
-                        column_vars=ctx.column_vars,
-                        row_stub_var=ctx.row_stub_var,
-                        has_row_stub_column=ctx.has_row_stub_column,
-                        has_group_stub_column=ctx.has_group_stub_column,
+                        column_vars=ctx.layout.column_vars,
+                        row_stub_var=ctx.layout.row_stub_var,
+                        has_row_stub_column=ctx.layout.has_row_stub_column,
+                        has_group_stub_column=ctx.layout.has_group_stub_column,
                         apply_stub_striping=False,
                         apply_body_striping=False,
-                        styles_cells=ctx.styles_summary,
-                        styles_labels=ctx.styles_summary_label,
+                        styles_cells=ctx.styles.styles_summary,
+                        styles_labels=ctx.styles.styles_summary_label,
                         row_index=si,
                         summary_row=summary_row,
                         css_class="gt_first_summary_row" if si == 0 else None,

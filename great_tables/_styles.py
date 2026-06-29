@@ -171,12 +171,16 @@ class CellStyleCss(CellStyle):
 
 
 @dataclass
-class _CellStyleTextSpec:
+class _CellStyleTextCore:
     color: str | ColumnExpr | None = None
     font: str | ColumnExpr | GoogleFont | None = None
     size: str | ColumnExpr | None = None
     align: Literal["center", "left", "right", "justify"] | ColumnExpr | None = None
     v_align: Literal["middle", "top", "bottom"] | ColumnExpr | None = None
+
+
+@dataclass
+class _CellStyleTextTypography:
     style: Literal["normal", "italic", "oblique"] | ColumnExpr | None = None
     weight: Literal["normal", "bold", "bolder", "lighter"] | ColumnExpr | None = None
     stretch: (
@@ -267,7 +271,8 @@ class CellStyleText(CellStyle):
     See [`GT.tab_style()`](`great_tables.GT.tab_style`).
     """
 
-    spec: _CellStyleTextSpec
+    core: _CellStyleTextCore
+    typography: _CellStyleTextTypography
 
     def __init__(
         self,
@@ -305,12 +310,14 @@ class CellStyleText(CellStyle):
             | None
         ) = None,
     ):
-        self.spec = _CellStyleTextSpec(
+        self.core = _CellStyleTextCore(
             color=color,
             font=font,
             size=size,
             align=align,
             v_align=v_align,
+        )
+        self.typography = _CellStyleTextTypography(
             style=style,
             weight=weight,
             stretch=stretch,
@@ -320,106 +327,112 @@ class CellStyleText(CellStyle):
         )
 
     @classmethod
-    def _from_spec(cls, spec: _CellStyleTextSpec) -> Self:
+    def _from_spec(
+        cls, core: _CellStyleTextCore, typography: _CellStyleTextTypography
+    ) -> Self:
         obj = cls.__new__(cls)
-        obj.spec = spec
+        obj.core = core
+        obj.typography = typography
         return obj
+
+    def _iter_specs(self):
+        return (self.core, self.typography)
 
     @property
     def color(self):
-        return self.spec.color
+        return self.core.color
 
     @color.setter
     def color(self, value):
-        self.spec.color = value
+        self.core.color = value
 
     @property
     def font(self):
-        return self.spec.font
+        return self.core.font
 
     @font.setter
     def font(self, value):
-        self.spec.font = value
+        self.core.font = value
 
     @property
     def size(self):
-        return self.spec.size
+        return self.core.size
 
     @size.setter
     def size(self, value):
-        self.spec.size = value
+        self.core.size = value
 
     @property
     def align(self):
-        return self.spec.align
+        return self.core.align
 
     @align.setter
     def align(self, value):
-        self.spec.align = value
+        self.core.align = value
 
     @property
     def v_align(self):
-        return self.spec.v_align
+        return self.core.v_align
 
     @v_align.setter
     def v_align(self, value):
-        self.spec.v_align = value
+        self.core.v_align = value
 
     @property
     def style(self):
-        return self.spec.style
+        return self.typography.style
 
     @style.setter
     def style(self, value):
-        self.spec.style = value
+        self.typography.style = value
 
     @property
     def weight(self):
-        return self.spec.weight
+        return self.typography.weight
 
     @weight.setter
     def weight(self, value):
-        self.spec.weight = value
+        self.typography.weight = value
 
     @property
     def stretch(self):
-        return self.spec.stretch
+        return self.typography.stretch
 
     @stretch.setter
     def stretch(self, value):
-        self.spec.stretch = value
+        self.typography.stretch = value
 
     @property
     def decorate(self):
-        return self.spec.decorate
+        return self.typography.decorate
 
     @decorate.setter
     def decorate(self, value):
-        self.spec.decorate = value
+        self.typography.decorate = value
 
     @property
     def transform(self):
-        return self.spec.transform
+        return self.typography.transform
 
     @transform.setter
     def transform(self, value):
-        self.spec.transform = value
+        self.typography.transform = value
 
     @property
     def whitespace(self):
-        return self.spec.whitespace
+        return self.typography.whitespace
 
     @whitespace.setter
     def whitespace(self, value):
-        self.spec.whitespace = value
+        self.typography.whitespace = value
 
     def _to_html_style(self) -> str:
         rendered = ""
 
-        if self.spec.color:
-            rendered += f"color: {self.spec.color};"
-        if self.spec.font:
-            font = self.spec.font
+        if self.core.color:
+            rendered += f"color: {self.core.color};"
+        if self.core.font:
+            font = self.core.font
             if isinstance(font, (str, FromColumn)):
                 # Case where `font=` is a string or a FromColumn expression
                 font_name = font
@@ -430,39 +443,45 @@ class CellStyleText(CellStyle):
                 # Case where font is of an invalid type
                 raise ValueError(f"Invalid font type '{type(font)}' provided.")
             rendered += f"font-family: {font_name};"
-        if self.spec.size:
-            rendered += f"font-size: {self.spec.size};"
-        if self.spec.align:
-            rendered += f"text-align: {self.spec.align};"
-        if self.spec.v_align:
-            rendered += f"vertical-align: {self.spec.v_align};"
-        if self.spec.style:
-            rendered += f"font-style: {self.spec.style};"
-        if self.spec.weight:
-            rendered += f"font-weight: {self.spec.weight};"
-        if self.spec.stretch:
-            rendered += f"font-stretch: {self.spec.stretch};"
-        if self.spec.decorate:
-            rendered += f"text-decoration: {self.spec.decorate};"
-        if self.spec.transform:
-            rendered += f"text-transform: {self.spec.transform};"
-        if self.spec.whitespace:
-            rendered += f"white-space: {self.spec.whitespace};"
+        if self.core.size:
+            rendered += f"font-size: {self.core.size};"
+        if self.core.align:
+            rendered += f"text-align: {self.core.align};"
+        if self.core.v_align:
+            rendered += f"vertical-align: {self.core.v_align};"
+        if self.typography.style:
+            rendered += f"font-style: {self.typography.style};"
+        if self.typography.weight:
+            rendered += f"font-weight: {self.typography.weight};"
+        if self.typography.stretch:
+            rendered += f"font-stretch: {self.typography.stretch};"
+        if self.typography.decorate:
+            rendered += f"text-decoration: {self.typography.decorate};"
+        if self.typography.transform:
+            rendered += f"text-transform: {self.typography.transform};"
+        if self.typography.whitespace:
+            rendered += f"white-space: {self.typography.whitespace};"
 
         return rendered
 
     def _evaluate_expressions(self, data: TblData) -> Self:
         new_fields: dict[str, FromValues] = {}
-        for field in fields(self.spec):
-            attr = getattr(self.spec, field.name)
-            if isinstance(attr, PlExpr) or callable(attr):
-                col_res = eval_transform(data, attr)
-                new_fields[field.name] = FromValues(expr=attr, values=col_res)
+        for spec in self._iter_specs():
+            for field in fields(spec):
+                attr = getattr(spec, field.name)
+                if isinstance(attr, PlExpr) or callable(attr):
+                    col_res = eval_transform(data, attr)
+                    new_fields[(spec.__class__, field.name)] = FromValues(expr=attr, values=col_res)
 
         if not new_fields:
             return self
 
-        return self._from_spec(replace(self.spec, **new_fields))
+        core_updates = {name: value for (spec_cls, name), value in new_fields.items() if spec_cls is _CellStyleTextCore}
+        typography_updates = {
+            name: value for (spec_cls, name), value in new_fields.items() if spec_cls is _CellStyleTextTypography
+        }
+
+        return self._from_spec(replace(self.core, **core_updates), replace(self.typography, **typography_updates))
 
     def _from_row(self, data: TblData, row: int) -> Self:
         """Return a new object with FromColumn replaced with values from row.
@@ -471,31 +490,38 @@ class CellStyleText(CellStyle):
         """
 
         new_fields: dict[str, Any] = {}
-        for field in fields(self.spec):
-            attr = getattr(self.spec, field.name)
-            if isinstance(attr, FromColumn):
-                # TODO: could validate that the value fetched from data is allowed.
-                # e.g. that color is a string, etc..
-                val = _get_cell(data, row, attr.column)
+        for spec in self._iter_specs():
+            for field in fields(spec):
+                attr = getattr(spec, field.name)
+                if isinstance(attr, FromColumn):
+                    # TODO: could validate that the value fetched from data is allowed.
+                    # e.g. that color is a string, etc..
+                    val = _get_cell(data, row, attr.column)
 
-                new_fields[field.name] = attr.fn(val) if attr.fn is not None else val
-            elif isinstance(attr, FromValues):
-                new_fields[field.name] = attr.values[row]
+                    new_fields[(spec.__class__, field.name)] = attr.fn(val) if attr.fn is not None else val
+                elif isinstance(attr, FromValues):
+                    new_fields[(spec.__class__, field.name)] = attr.values[row]
 
         if not new_fields:
             return self
 
-        return self._from_spec(replace(self.spec, **new_fields))
+        core_updates = {name: value for (spec_cls, name), value in new_fields.items() if spec_cls is _CellStyleTextCore}
+        typography_updates = {
+            name: value for (spec_cls, name), value in new_fields.items() if spec_cls is _CellStyleTextTypography
+        }
+
+        return self._from_spec(replace(self.core, **core_updates), replace(self.typography, **typography_updates))
 
     def _raise_if_requires_data(self, loc: Loc):
-        for field in fields(self.spec):
-            attr = getattr(self.spec, field.name)
-            if isinstance(attr, FromColumn):
-                raise TypeError(
-                    f"Location type {type(loc)} cannot use FromColumn."
-                    f"\n\nStyle type: {type(self)}"
-                    f"\nField with FromColumn: {field.name}"
-                )
+        for spec in self._iter_specs():
+            for field in fields(spec):
+                attr = getattr(spec, field.name)
+                if isinstance(attr, FromColumn):
+                    raise TypeError(
+                        f"Location type {type(loc)} cannot use FromColumn."
+                        f"\n\nStyle type: {type(self)}"
+                        f"\nField with FromColumn: {field.name}"
+                    )
 
 
 @dataclass

@@ -5772,13 +5772,17 @@ def fmt_icon(
         sep=sep,
         config=FmtIconConfig(
             height=height,
-            stroke_color=stroke_color,
-            stroke_width=stroke_width,
-            stroke_alpha=stroke_alpha,
-            fill_color=fill_color,
-            fill_alpha=fill_alpha,
-            margin_left=margin_left,
-            margin_right=margin_right,
+            style=FmtIconStyleConfig(
+                stroke_color=stroke_color,
+                stroke_width=stroke_width,
+                stroke_alpha=stroke_alpha,
+                fill_color=fill_color,
+                fill_alpha=fill_alpha,
+            ),
+            margins=FmtIconMarginConfig(
+                margin_left=margin_left,
+                margin_right=margin_right,
+            ),
         ),
     )
 
@@ -5791,15 +5795,25 @@ def fmt_icon(
 
 
 @dataclass
-class FmtIconConfig:
-    height: str | None = None
+class FmtIconStyleConfig:
     stroke_color: str | None = None
     stroke_width: str | int | float | None = None
     stroke_alpha: float | None = None
     fill_color: str | dict[str, str] | None = None
     fill_alpha: float | None = None
+
+
+@dataclass
+class FmtIconMarginConfig:
     margin_left: str | None = None
     margin_right: str | None = None
+
+
+@dataclass
+class FmtIconConfig:
+    height: str | None = None
+    style: FmtIconStyleConfig = field(default_factory=FmtIconStyleConfig)
+    margins: FmtIconMarginConfig = field(default_factory=FmtIconMarginConfig)
 
 
 @dataclass
@@ -5824,34 +5838,34 @@ class FmtIcon:
         else:
             height = self.config.height
 
-        if self.config.stroke_width is None:
+        if self.config.style.stroke_width is None:
             stroke_width = "1px"
-        elif isinstance(self.config.stroke_width, (int, float)):
-            stroke_width = f"{self.config.stroke_width}px"
+        elif isinstance(self.config.style.stroke_width, (int, float)):
+            stroke_width = f"{self.config.style.stroke_width}px"
         else:
-            stroke_width = self.config.stroke_width
+            stroke_width = self.config.style.stroke_width
 
         out: list[str] = []
 
         for icon in icon_list:
-            if isinstance(self.config.fill_color, dict):
-                if icon in self.config.fill_color:
-                    fill_color = self.config.fill_color[icon]
+            if isinstance(self.config.style.fill_color, dict):
+                if icon in self.config.style.fill_color:
+                    fill_color = self.config.style.fill_color[icon]
                 else:
                     fill_color = None
             else:
-                fill_color = self.config.fill_color
+                fill_color = self.config.style.fill_color
 
             icon_svg = faicons.icon_svg(
                 icon,
                 height=height,
-                stroke=self.config.stroke_color,
+                stroke=self.config.style.stroke_color,
                 stroke_width=stroke_width,
-                stroke_opacity=str(self.config.stroke_alpha),
+                stroke_opacity=str(self.config.style.stroke_alpha),
                 fill=fill_color,
-                fill_opacity=str(self.config.fill_alpha),
-                margin_left=self.config.margin_left,
-                margin_right=self.config.margin_right,
+                fill_opacity=str(self.config.style.fill_alpha),
+                margin_left=self.config.margins.margin_left,
+                margin_right=self.config.margins.margin_right,
             )
 
             out.append(str(icon_svg))
