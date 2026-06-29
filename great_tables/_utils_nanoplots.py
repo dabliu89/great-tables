@@ -112,6 +112,102 @@ def calc_ref_value(val_or_calc: int | float | str, data) -> int | float | str:
     raise ValueError(f"Unsupported nanoplot area value: {val_or_calc}")
 
 
+def _apply_custom_number_format(
+    val: int | float,
+    fn: Callable[..., str] | None,
+) -> str | None:
+    if fn is None:
+        return None
+
+    if callable(fn):
+        res = fn(val)
+
+        if not isinstance(res, str):
+            raise ValueError("The result of the formatting function must be a single string value.")
+
+        return res
+
+    return None
+
+
+def _get_number_format_profile(val: int | float) -> tuple[bool, int | None, int, bool]:
+    abs_val = abs(val)
+
+    if abs_val < 0.01:
+        return True, None, 2, False
+
+    if abs_val < 1:
+        return True, None, 2, False
+
+    if abs_val < 100:
+        return True, None, 3, False
+
+    if abs_val < 1000:
+        return True, None, 3, False
+
+    if abs_val < 10000:
+        return False, 2, 3, True
+
+    if abs_val < 100000:
+        return False, 1, 3, True
+
+    if abs_val < 1000000:
+        return False, 0, 3, True
+
+    if abs_val < 1e15:
+        return False, 1, 3, True
+
+    return False, None, 2, False
+
+
+def _format_number_default(
+    val: int | float,
+    currency: str | None,
+    as_integer: bool,
+    use_subunits: bool,
+    decimals: int | None,
+    n_sigfig: int,
+    compact: bool,
+) -> str:
+    from great_tables.vals import fmt_currency, fmt_integer, fmt_number, fmt_scientific
+
+    if currency is not None:
+        if abs(val) >= 1e15:
+            val_formatted = fmt_currency(
+                1e15,
+                currency=currency,
+                use_subunits=False,
+                decimals=0,
+            )
+
+            return f">{val_formatted}"
+
+        return fmt_currency(
+            val,
+            currency=currency,
+            use_subunits=use_subunits,
+            decimals=decimals,
+        )
+
+    if abs(val) < 0.01 or abs(val) >= 1e15:
+        return fmt_scientific(
+            val,
+            exp_style="E",
+            n_sigfig=n_sigfig,
+            decimals=1,
+        )
+
+    if as_integer and -100 < val < 100:
+        return fmt_integer(val)
+
+    return fmt_number(
+        val,
+        n_sigfig=n_sigfig,
+        decimals=1,
+        compact=compact,
+    )
+
+
 def _format_number_compactly(
     val: int | float,
     currency: str | None = None,
@@ -122,16 +218,9 @@ def _format_number_compactly(
     Format a single numeric value compactly, using a currency if provided.
     """
 
-    from great_tables.vals import fmt_currency, fmt_integer, fmt_number, fmt_scientific
-
-    if fn is not None and isinstance(fn, Callable):
-        res = fn(val)
-
-        # Check whether the result is a single string value; if not, raise an error
-        if not isinstance(res, str):
-            raise ValueError("The result of the formatting function must be a single string value.")
-
-        return res
+    custom_format = _apply_custom_number_format(val=val, fn=fn)
+    if custom_format is not None:
+        return custom_format
 
     if _is_na(val):
         return "NA"
@@ -139,111 +228,17 @@ def _format_number_compactly(
     if val == 0:
         return "0"
 
-    if abs(val) < 0.01:
-        use_subunits = True
-        decimals = None
+    use_subunits, decimals, n_sigfig, compact = _get_number_format_profile(val)
 
-        n_sigfig = 2
-        compact = False
-
-    elif abs(val) < 1:
-        use_subunits = True
-        decimals = None
-
-        n_sigfig = 2
-        compact = False
-
-    elif abs(val) < 100:
-        use_subunits = True
-        decimals = None
-
-        n_sigfig = 3
-        compact = False
-
-    elif abs(val) < 1000:
-        use_subunits = True
-        decimals = None
-
-        n_sigfig = 3
-        compact = False
-
-    elif abs(val) < 10000:
-        use_subunits = False
-        decimals = 2
-
-        n_sigfig = 3
-        compact = True
-
-    elif abs(val) < 100000:
-        use_subunits = False
-        decimals = 1
-
-        n_sigfig = 3
-        compact = True
-
-    elif abs(val) < 1000000:
-        use_subunits = False
-        decimals = 0
-
-        n_sigfig = 3
-        compact = True
-
-    elif abs(val) < 1e15:
-        use_subunits = False
-        decimals = 1
-
-        n_sigfig = 3
-        compact = True
-
-    else:
-        use_subunits = False
-        decimals = None
-        n_sigfig = 2
-        compact = False
-
-    # Format value accordingly
-
-    if currency is not None:
-        if abs(val) >= 1e15:
-            val_formatted = fmt_currency(
-                1e15,
-                currency=currency,
-                use_subunits=False,
-                decimals=0,
-                # compact=True,
-            )
-
-            val_formatted = f">{val_formatted}"
-
-        else:
-            val_formatted = fmt_currency(
-                val,
-                currency=currency,
-                use_subunits=use_subunits,
-                decimals=decimals,
-                # compact=compact,
-            )
-
-    else:
-        if abs(val) < 0.01 or abs(val) >= 1e15:
-            val_formatted = fmt_scientific(
-                val,
-                exp_style="E",
-                n_sigfig=n_sigfig,
-                decimals=1,
-            )
-
-        else:
-            if as_integer and val > -100 and val < 100:
-                val_formatted = fmt_integer(val)
-
-            else:
-                val_formatted = fmt_number(
-                    val,
-                    n_sigfig=n_sigfig,
-                    decimals=1,
-                    compact=compact,
-                )
+    val_formatted = _format_number_default(
+        val=val,
+        currency=currency,
+        as_integer=as_integer,
+        use_subunits=use_subunits,
+        decimals=decimals,
+        n_sigfig=n_sigfig,
+        compact=compact,
+    )
 
     return val_formatted[0]
 
@@ -540,6 +535,95 @@ def _construct_nanoplot_svg(
 
 
 def _generate_nanoplot(
+    y_vals: list[int] | list[float] | list[int | float],
+    y_ref_line: str | None = None,
+    y_ref_area: str | None = None,
+    x_vals: list[int | float] | None = None,
+    expand_x: list[int] | list[float] | list[int | float] | None = None,
+    expand_y: list[int] | list[float] | list[int | float] | None = None,
+    missing_vals: str = "marker",
+    all_y_vals: list[int] | list[float] | list[int | float] | None = None,
+    all_single_y_vals: list[int] | list[float] | list[int | float] | None = None,
+    plot_type: str = "line",
+    data_line_type: str = "curved",
+    currency: str | None = None,
+    y_val_fmt_fn: Callable[..., str] | None = None,
+    y_axis_fmt_fn: Callable[..., str] | None = None,
+    y_ref_line_fmt_fn: Callable[..., str] | None = None,
+    data_point_radius: int | list[int] = 10,
+    data_point_stroke_color: str | list[str] = "#FFFFFF",
+    data_point_stroke_width: int | list[int] = 4,
+    data_point_fill_color: str | list[str] = "#FF0000",
+    data_line_stroke_color: str = "#4682B4",
+    data_line_stroke_width: int = 8,
+    data_area_fill_color: str = "#FF0000",
+    data_bar_stroke_color: str | list[str] = "#3290CC",
+    data_bar_stroke_width: int | list[int] = 4,
+    data_bar_fill_color: str | list[str] = "#3FB5FF",
+    data_bar_negative_stroke_color: str = "#CC3243",
+    data_bar_negative_stroke_width: int = 4,
+    data_bar_negative_fill_color: str = "#D75A68",
+    reference_line_color: str = "#75A8B0",
+    reference_area_fill_color: str = "#A6E6F2",
+    vertical_guide_stroke_color: str = "#911EB4",
+    vertical_guide_stroke_width: int = 12,
+    show_data_points: bool = True,
+    show_data_line: bool = True,
+    show_data_area: bool = True,
+    show_reference_line: bool = True,
+    show_reference_area: bool = True,
+    show_vertical_guides: bool = True,
+    show_y_axis_guide: bool = True,
+    interactive_data_values: bool = True,
+    svg_height: str = "2em",
+) -> str:
+    return _generate_nanoplot_impl(
+        y_vals=y_vals,
+        y_ref_line=y_ref_line,
+        y_ref_area=y_ref_area,
+        x_vals=x_vals,
+        expand_x=expand_x,
+        expand_y=expand_y,
+        missing_vals=missing_vals,
+        all_y_vals=all_y_vals,
+        all_single_y_vals=all_single_y_vals,
+        plot_type=plot_type,
+        data_line_type=data_line_type,
+        currency=currency,
+        y_val_fmt_fn=y_val_fmt_fn,
+        y_axis_fmt_fn=y_axis_fmt_fn,
+        y_ref_line_fmt_fn=y_ref_line_fmt_fn,
+        data_point_radius=data_point_radius,
+        data_point_stroke_color=data_point_stroke_color,
+        data_point_stroke_width=data_point_stroke_width,
+        data_point_fill_color=data_point_fill_color,
+        data_line_stroke_color=data_line_stroke_color,
+        data_line_stroke_width=data_line_stroke_width,
+        data_area_fill_color=data_area_fill_color,
+        data_bar_stroke_color=data_bar_stroke_color,
+        data_bar_stroke_width=data_bar_stroke_width,
+        data_bar_fill_color=data_bar_fill_color,
+        data_bar_negative_stroke_color=data_bar_negative_stroke_color,
+        data_bar_negative_stroke_width=data_bar_negative_stroke_width,
+        data_bar_negative_fill_color=data_bar_negative_fill_color,
+        reference_line_color=reference_line_color,
+        reference_area_fill_color=reference_area_fill_color,
+        vertical_guide_stroke_color=vertical_guide_stroke_color,
+        vertical_guide_stroke_width=vertical_guide_stroke_width,
+        show_data_points=show_data_points,
+        show_data_line=show_data_line,
+        show_data_area=show_data_area,
+        show_reference_line=show_reference_line,
+        show_reference_area=show_reference_area,
+        show_vertical_guides=show_vertical_guides,
+        show_y_axis_guide=show_y_axis_guide,
+        interactive_data_values=interactive_data_values,
+        svg_height=svg_height,
+    )
+
+
+# pylint: disable=too-many-statements
+def _generate_nanoplot_impl(
     y_vals: list[int] | list[float] | list[int | float],
     y_ref_line: str | None = None,
     y_ref_area: str | None = None,
@@ -1012,84 +1096,59 @@ def _generate_nanoplot(
 
     n_segments = len(start_data_y_points)
 
-    #
-    # Generate a curved data line
-    #
+    data_path_tags = _build_nanoplot_line_path_tags(
+        plot_type=plot_type,
+        show_data_line=show_data_line,
+        data_line_type=data_line_type,
+        n_segments=n_segments,
+        start_data_y_points=start_data_y_points,
+        end_data_y_points=end_data_y_points,
+        data_x_points=data_x_points,
+        data_y_points=data_y_points,
+        x_d=x_d,
+        data_line_stroke_color=data_line_stroke_color,
+        data_line_stroke_width=data_line_stroke_width,
+    )
 
-    if plot_type == "line" and show_data_line and data_line_type == "curved":
-        data_path_tags = []
-
-        for i in range(n_segments):
-            curve_x = data_x_points[start_data_y_points[i] : end_data_y_points[i]]
-            curve_y = data_y_points[start_data_y_points[i] : end_data_y_points[i]]
-
-            curved_path_string = [f"M {curve_x[0]},{curve_y[0]}"]
-
-            for j in range(1, len(curve_x)):
-                point_b1 = f"{curve_x[j - 1] + x_d / 2},{curve_y[j - 1]}"
-                point_b2 = f"{curve_x[j] - x_d / 2},{curve_y[j]}"
-                point_i = f"{curve_x[j]},{curve_y[j]}"
-
-                path_string_j = f"C {point_b1} {point_b2} {point_i}"
-
-                curved_path_string.append(path_string_j)
-
-            curved_path_string_i = " ".join(curved_path_string)
-
-            data_path_tags_i = f'<path d="{curved_path_string_i}" stroke="{data_line_stroke_color}" stroke-width="{data_line_stroke_width}" fill="none"></path>'
-
-            data_path_tags.append(data_path_tags_i)
-
-        data_path_tags = "\n".join(data_path_tags)
-
-    if plot_type == "line" and show_data_line and data_line_type == "straight":
-        data_path_tags = []
-
-        for i in range(n_segments):
-            line_x = data_x_points[start_data_y_points[i] : end_data_y_points[i]]
-            line_y = data_y_points[start_data_y_points[i] : end_data_y_points[i]]
-
-            line_xy = " ".join((f"{x},{y}" for x, y in zip(line_x, line_y)))
-
-            data_path_tags_i = f'<polyline points="{line_xy}" stroke="{data_line_stroke_color}" stroke-width="{data_line_stroke_width}" fill="none"></polyline>'
-
-            data_path_tags.append(data_path_tags_i)
-
-        data_path_tags = "".join(data_path_tags)
-
-    #
-    # Generate data points
-    #
-
-    if plot_type == "line" and show_data_points:
-        circle_strings = []
-
-        for i, (data_x_point_i, data_y_point_i) in enumerate(zip(data_x_points, data_y_points)):
-            data_point_radius_i = data_point_radius[i]
-            data_point_stroke_color_i = data_point_stroke_color[i]
-            data_point_stroke_width_i = data_point_stroke_width[i]
-            data_point_fill_color_i = data_point_fill_color[i]
-
-            if data_y_point_i is None:
-                if missing_vals == "marker":
-                    # Create a symbol that should denote that a missing value is present
-                    circle_strings_i = f'<circle cx="{data_x_point_i}" cy="{safe_y_d + (data_y_height / 2)}" r="{data_point_radius_i + (data_point_radius_i / 2)}" stroke="red" stroke-width="{data_point_stroke_width_i}" fill="white"></circle>'
-
-                else:
-                    continue
-
-            else:
-                circle_strings_i = f'<circle cx="{data_x_point_i}" cy="{data_y_point_i}" r="{data_point_radius_i}" stroke="{data_point_stroke_color_i}" stroke-width="{data_point_stroke_width_i}" fill="{data_point_fill_color_i}"></circle>'
-
-            circle_strings.append(circle_strings_i)
-
-        circle_tags = "".join(circle_strings)
+    circle_tags = _build_nanoplot_point_tags(
+        plot_type=plot_type,
+        show_data_points=show_data_points,
+        data_x_points=data_x_points,
+        data_y_points=data_y_points,
+        data_point_radius=data_point_radius,
+        data_point_stroke_color=data_point_stroke_color,
+        data_point_stroke_width=data_point_stroke_width,
+        data_point_fill_color=data_point_fill_color,
+        missing_vals=missing_vals,
+        safe_y_d=safe_y_d,
+        data_y_height=data_y_height,
+    )
 
     #
     # Generate data bars
     #
 
-    if plot_type == "bar" and single_horizontal_plot is False:
+    bar_tags = _build_nanoplot_bar_tags(
+        plot_type=plot_type,
+        single_horizontal_plot=single_horizontal_plot,
+        data_x_points=data_x_points,
+        data_y_points=data_y_points,
+        data_point_radius=data_point_radius,
+        data_bar_stroke_color=data_bar_stroke_color,
+        data_bar_stroke_width=data_bar_stroke_width,
+        data_bar_fill_color=data_bar_fill_color,
+        missing_vals=missing_vals,
+        x_d=x_d,
+        y_vals=y_vals,
+        data_y0_point=data_y0_point,
+        data_bar_negative_stroke_color=data_bar_negative_stroke_color,
+        data_bar_negative_stroke_width=data_bar_negative_stroke_width,
+        data_bar_negative_fill_color=data_bar_negative_fill_color,
+        safe_y_d=safe_y_d,
+        data_y_height=data_y_height,
+    )
+
+    if False and plot_type == "bar" and single_horizontal_plot is False:
         bar_strings = []
 
         for i, (data_x_point_i, data_y_point_i) in enumerate(zip(data_x_points, data_y_points)):
@@ -1511,6 +1570,154 @@ def _generate_nanoplot(
     )
 
     return nanoplot_svg
+
+
+def _build_nanoplot_line_path_tags(
+    plot_type: str,
+    show_data_line: bool,
+    data_line_type: str,
+    n_segments: int,
+    start_data_y_points: list[int],
+    end_data_y_points: list[int],
+    data_x_points: tuple[float, ...],
+    data_y_points: tuple[int | float | None, ...],
+    x_d: int | None,
+    data_line_stroke_color: str,
+    data_line_stroke_width: int,
+) -> str | None:
+    if plot_type != "line" or not show_data_line:
+        return None
+
+    if data_line_type == "curved":
+        data_path_tags = []
+
+        for i in range(n_segments):
+            curve_x = data_x_points[start_data_y_points[i] : end_data_y_points[i]]
+            curve_y = data_y_points[start_data_y_points[i] : end_data_y_points[i]]
+
+            curved_path_string = [f"M {curve_x[0]},{curve_y[0]}"]
+
+            for j in range(1, len(curve_x)):
+                point_b1 = f"{curve_x[j - 1] + x_d / 2},{curve_y[j - 1]}"
+                point_b2 = f"{curve_x[j] - x_d / 2},{curve_y[j]}"
+                point_i = f"{curve_x[j]},{curve_y[j]}"
+
+                curved_path_string.append(f"C {point_b1} {point_b2} {point_i}")
+
+            curved_path_string_i = " ".join(curved_path_string)
+            data_path_tags.append(
+                f'<path d="{curved_path_string_i}" stroke="{data_line_stroke_color}" stroke-width="{data_line_stroke_width}" fill="none"></path>'
+            )
+
+        return "\n".join(data_path_tags)
+
+    data_path_tags = []
+    for i in range(n_segments):
+        line_x = data_x_points[start_data_y_points[i] : end_data_y_points[i]]
+        line_y = data_y_points[start_data_y_points[i] : end_data_y_points[i]]
+
+        line_xy = " ".join((f"{x},{y}" for x, y in zip(line_x, line_y)))
+        data_path_tags.append(
+            f'<polyline points="{line_xy}" stroke="{data_line_stroke_color}" stroke-width="{data_line_stroke_width}" fill="none"></polyline>'
+        )
+
+    return "".join(data_path_tags)
+
+
+def _build_nanoplot_point_tags(
+    plot_type: str,
+    show_data_points: bool,
+    data_x_points: tuple[float, ...],
+    data_y_points: tuple[int | float | None, ...],
+    data_point_radius: list[int],
+    data_point_stroke_color: list[str],
+    data_point_stroke_width: list[int],
+    data_point_fill_color: list[str],
+    missing_vals: str,
+    safe_y_d: int,
+    data_y_height: int,
+) -> str | None:
+    if plot_type != "line" or not show_data_points:
+        return None
+
+    circle_strings = []
+
+    for i, (data_x_point_i, data_y_point_i) in enumerate(zip(data_x_points, data_y_points)):
+        data_point_radius_i = data_point_radius[i]
+        data_point_stroke_color_i = data_point_stroke_color[i]
+        data_point_stroke_width_i = data_point_stroke_width[i]
+        data_point_fill_color_i = data_point_fill_color[i]
+
+        if data_y_point_i is None:
+            if missing_vals == "marker":
+                circle_strings_i = f'<circle cx="{data_x_point_i}" cy="{safe_y_d + (data_y_height / 2)}" r="{data_point_radius_i + (data_point_radius_i / 2)}" stroke="red" stroke-width="{data_point_stroke_width_i}" fill="white"></circle>'
+            else:
+                continue
+        else:
+            circle_strings_i = f'<circle cx="{data_x_point_i}" cy="{data_y_point_i}" r="{data_point_radius_i}" stroke="{data_point_stroke_color_i}" stroke-width="{data_point_stroke_width_i}" fill="{data_point_fill_color_i}"></circle>'
+
+        circle_strings.append(circle_strings_i)
+
+    return "".join(circle_strings)
+
+
+def _build_nanoplot_bar_tags(
+    plot_type: str,
+    single_horizontal_plot: bool,
+    data_x_points: tuple[float, ...],
+    data_y_points: tuple[int | float | None, ...],
+    data_point_radius: list[int],
+    data_bar_stroke_color: list[str],
+    data_bar_stroke_width: list[int],
+    data_bar_fill_color: list[str],
+    missing_vals: str,
+    x_d: int | None,
+    y_vals: list[int] | list[float] | list[int | float],
+    data_y0_point: float | None,
+    data_bar_negative_stroke_color: str,
+    data_bar_negative_stroke_width: int,
+    data_bar_negative_fill_color: str,
+    safe_y_d: int,
+    data_y_height: int,
+) -> str | None:
+    if plot_type != "bar" or single_horizontal_plot:
+        return None
+
+    bar_strings = []
+
+    for i, (data_x_point_i, data_y_point_i) in enumerate(zip(data_x_points, data_y_points)):
+        data_point_radius_i = data_point_radius[i]
+        data_bar_stroke_color_i = data_bar_stroke_color[i]
+        data_bar_stroke_width_i = data_bar_stroke_width[i]
+        data_bar_fill_color_i = data_bar_fill_color[i]
+
+        if data_y_point_i is None:
+            if missing_vals == "marker":
+                bar_strings_i = f'<circle cx="{data_x_point_i}" cy="{safe_y_d + (data_y_height / 2)}" r="{data_point_radius_i + (data_point_radius_i / 2)}" stroke="red" stroke-width="{data_bar_stroke_width_i}" fill="transparent"></circle>'
+            else:
+                continue
+        else:
+            if y_vals[i] < 0:
+                y_value_i = data_y_point_i
+                y_height = data_y_point_i - data_y0_point
+                data_bar_stroke_color_i = data_bar_negative_stroke_color
+                data_bar_stroke_width_i = data_bar_negative_stroke_width
+                data_bar_fill_color_i = data_bar_negative_fill_color
+            elif y_vals[i] > 0:
+                y_value_i = data_y_point_i
+                y_height = data_y0_point - data_y_point_i
+            else:
+                y_value_i = data_y0_point - 1
+                y_height = 2
+                data_bar_stroke_color_i = "#808080"
+                data_bar_stroke_width_i = 4
+                data_bar_fill_color_i = "#808080"
+
+            bar_strings_i = f'<rect x="{data_x_point_i - (x_d - 10) / 2}" y="{y_value_i}" width="{x_d - 10}" height="{y_height}" stroke="{data_bar_stroke_color_i}" stroke-width="{data_bar_stroke_width_i}" fill="{data_bar_fill_color_i}"></rect>'
+
+        bar_strings.append(bar_strings_i)
+
+    return "".join(bar_strings)
 
 
 def _is_intlike(n: Any, scaled_by: float = 1e17) -> bool:
