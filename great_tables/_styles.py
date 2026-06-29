@@ -426,41 +426,42 @@ class CellStyleText(CellStyle):
     def whitespace(self, value):
         self.typography.whitespace = value
 
+    def _font_name(self) -> str | FromColumn:
+        font = self.font
+        if isinstance(font, (str, FromColumn)):
+            # Case where `font=` is a string or a FromColumn expression
+            return font
+        if isinstance(font, GoogleFont):
+            # Case where `font=` is a GoogleFont
+            return font.get_font_name()
+        # Case where font is of an invalid type
+        raise ValueError(f"Invalid font type '{type(font)}' provided.")
+
     def _to_html_style(self) -> str:
         rendered = ""
 
-        if self.core.color:
-            rendered += f"color: {self.core.color};"
-        if self.core.font:
-            font = self.core.font
-            if isinstance(font, (str, FromColumn)):
-                # Case where `font=` is a string or a FromColumn expression
-                font_name = font
-            elif isinstance(font, GoogleFont):
-                # Case where `font=` is a GoogleFont
-                font_name = font.get_font_name()
-            else:
-                # Case where font is of an invalid type
-                raise ValueError(f"Invalid font type '{type(font)}' provided.")
-            rendered += f"font-family: {font_name};"
-        if self.core.size:
-            rendered += f"font-size: {self.core.size};"
-        if self.core.align:
-            rendered += f"text-align: {self.core.align};"
-        if self.core.v_align:
-            rendered += f"vertical-align: {self.core.v_align};"
-        if self.typography.style:
-            rendered += f"font-style: {self.typography.style};"
-        if self.typography.weight:
-            rendered += f"font-weight: {self.typography.weight};"
-        if self.typography.stretch:
-            rendered += f"font-stretch: {self.typography.stretch};"
-        if self.typography.decorate:
-            rendered += f"text-decoration: {self.typography.decorate};"
-        if self.typography.transform:
-            rendered += f"text-transform: {self.typography.transform};"
-        if self.typography.whitespace:
-            rendered += f"white-space: {self.typography.whitespace};"
+        if self.color:
+            rendered += f"color: {self.color};"
+        if self.font:
+            rendered += f"font-family: {self._font_name()};"
+        if self.size:
+            rendered += f"font-size: {self.size};"
+        if self.align:
+            rendered += f"text-align: {self.align};"
+        if self.v_align:
+            rendered += f"vertical-align: {self.v_align};"
+        if self.style:
+            rendered += f"font-style: {self.style};"
+        if self.weight:
+            rendered += f"font-weight: {self.weight};"
+        if self.stretch:
+            rendered += f"font-stretch: {self.stretch};"
+        if self.decorate:
+            rendered += f"text-decoration: {self.decorate};"
+        if self.transform:
+            rendered += f"text-transform: {self.transform};"
+        if self.whitespace:
+            rendered += f"white-space: {self.whitespace};"
 
         return rendered
 
