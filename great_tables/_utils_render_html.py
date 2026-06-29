@@ -1025,6 +1025,74 @@ def _get_row_cell_footnotes_h(
     ]
 
 
+def _create_row_cell_h(
+    colinfo: ColInfo,
+    row_stub_var: ColInfo | None,
+    row_index: int | None,
+    tbl_data: TblData | None,
+    summary_row: SummaryRowInfo | None,
+    styles_cells: list[StyleInfo],
+    styles_labels: list[StyleInfo],
+    css_class: str | None,
+    data: GTData | None,
+    is_summary_row: bool,
+    is_group_summary: bool,
+    summary_css_class: str,
+    apply_stub_striping: bool,
+    apply_body_striping: bool,
+    summary_group_id: str | None,
+) -> str:
+    cell_content = _get_row_cell_content_h(
+        colinfo=colinfo,
+        row_stub_var=row_stub_var,
+        row_index=row_index,
+        tbl_data=tbl_data,
+        summary_row=summary_row,
+    )
+
+    classes = [css_class] if css_class else []
+    cell_str = str(cell_content)
+    cell_alignment = colinfo.defaulted_align
+
+    footnotes_i = _get_row_cell_footnotes_h(
+        data=data,
+        colinfo=colinfo,
+        row_index=row_index,
+        is_summary_row=is_summary_row,
+        is_group_summary=is_group_summary,
+        summary_group_id=summary_group_id,
+    )
+    if footnotes_i:
+        cell_str = _apply_footnotes_to_text(footnotes_i, data, cell_str)
+
+    _body_styles = [
+        x for x in styles_cells if x.rownum == row_index and x.colname == colinfo.var
+    ]
+    _rowname_styles = (
+        [x for x in styles_labels if x.rownum == row_index] if colinfo.is_stub else []
+    )
+
+    if colinfo.is_stub:
+        el_name = "th"
+        classes += ["gt_row", "gt_left", "gt_stub"]
+        if is_summary_row:
+            classes.append(summary_css_class)
+        if apply_stub_striping:
+            classes.append("gt_striped")
+    else:
+        el_name = "td"
+        classes += ["gt_row", f"gt_{cell_alignment}"]
+        if is_summary_row:
+            classes.append(summary_css_class)
+        if apply_body_striping:
+            classes.append("gt_striped")
+
+    classes_str = " ".join(classes)
+    cell_styles = _flatten_styles(_body_styles + _rowname_styles, wrap=True)
+
+    return f'''    <{el_name}{cell_styles} class="{classes_str}">{cell_str}</{el_name}>'''
+
+
 def _create_row_component_h(
     column_vars: list[ColInfo],
     row_stub_var: ColInfo | None,
@@ -1071,64 +1139,24 @@ def _create_row_component_h(
         column_vars_to_process = column_vars
 
     for colinfo in column_vars_to_process:
-        # Get cell content
-        cell_content = _get_row_cell_content_h(
-            colinfo=colinfo,
-            row_stub_var=row_stub_var,
-            row_index=row_index,
-            tbl_data=tbl_data,
-            summary_row=summary_row,
-        )
-
-        if css_class:
-            classes = [css_class]
-        else:
-            classes = []
-
-        cell_str = str(cell_content)
-        cell_alignment = colinfo.defaulted_align
-
-        # Apply footnotes to cell content if data is provided
-        footnotes_i = _get_row_cell_footnotes_h(
-            data=data,
-            colinfo=colinfo,
-            row_index=row_index,
-            is_summary_row=is_summary_row,
-            is_group_summary=is_group_summary,
-            summary_group_id=summary_group_id,
-        )
-        if footnotes_i:
-            cell_str = _apply_footnotes_to_text(footnotes_i, data, cell_str)
-
-        # Get styles
-        _body_styles = [
-            x for x in styles_cells if x.rownum == row_index and x.colname == colinfo.var
-        ]
-        _rowname_styles = (
-            [x for x in styles_labels if x.rownum == row_index] if colinfo.is_stub else []
-        )
-
-        # Build classes and element
-        if colinfo.is_stub:
-            el_name = "th"
-            classes += ["gt_row", "gt_left", "gt_stub"]
-            if is_summary_row:
-                classes.append(summary_css_class)
-            if apply_stub_striping:
-                classes.append("gt_striped")
-        else:
-            el_name = "td"
-            classes += ["gt_row", f"gt_{cell_alignment}"]
-            if is_summary_row:
-                classes.append(summary_css_class)
-            if apply_body_striping:
-                classes.append("gt_striped")
-
-        classes_str = " ".join(classes)
-        cell_styles = _flatten_styles(_body_styles + _rowname_styles, wrap=True)
-
         body_cells.append(
-            f"""    <{el_name}{cell_styles} class="{classes_str}">{cell_str}</{el_name}>"""
+            _create_row_cell_h(
+                colinfo=colinfo,
+                row_stub_var=row_stub_var,
+                row_index=row_index,
+                tbl_data=tbl_data,
+                summary_row=summary_row,
+                styles_cells=styles_cells,
+                styles_labels=styles_labels,
+                css_class=css_class,
+                data=data,
+                is_summary_row=is_summary_row,
+                is_group_summary=is_group_summary,
+                summary_css_class=summary_css_class,
+                apply_stub_striping=apply_stub_striping,
+                apply_body_striping=apply_body_striping,
+                summary_group_id=summary_group_id,
+            )
         )
 
     tr_open = f'  <tr class="{row_class}">' if row_class else "  <tr>"
