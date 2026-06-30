@@ -1,0 +1,314 @@
+[
+  {
+    "arquivo": "great_tables/_formats.py",
+    "convention": 56,
+    "total": 225,
+    "warning": 57,
+    "refactor": 112
+  },
+  {
+    "arquivo": "great_tables/_utils_render_html.py",
+    "convention": 24,
+    "total": 198,
+    "warning": 138,
+    "refactor": 35,
+    "error": 1
+  },
+  {
+    "arquivo": "great_tables/_options.py",
+    "convention": 7,
+    "total": 179,
+    "warning": 166,
+    "refactor": 6
+  },
+  {
+    "arquivo": "great_tables/_gt_data.py",
+    "convention": 72,
+    "total": 138,
+    "warning": 48,
+    "error": 3,
+    "refactor": 15
+  },
+  {
+    "arquivo": "great_tables/_utils_nanoplots.py",
+    "convention": 97,
+    "total": 130,
+    "warning": 4,
+    "refactor": 27,
+    "error": 2
+  },
+  {
+    "arquivo": "great_tables/_tbl_data.py",
+    "warning": 14,
+    "total": 89,
+    "convention": 49,
+    "refactor": 22,
+    "error": 4
+  },
+  {
+    "arquivo": "great_tables/_locations.py",
+    "convention": 5,
+    "total": 81,
+    "warning": 69,
+    "refactor": 7
+  },
+  {
+    "arquivo": "great_tables/_spanners.py",
+    "convention": 14,
+    "total": 67,
+    "warning": 38,
+    "refactor": 15
+  },
+  {
+    "arquivo": "great_tables/_utils_render_latex.py",
+    "warning": 44,
+    "total": 62,
+    "convention": 13,
+    "refactor": 5
+  },
+  {
+    "arquivo": "great_tables/gt.py",
+    "convention": 10,
+    "total": 38,
+    "warning": 23,
+    "refactor": 4,
+    "error": 1
+  },
+  {
+    "arquivo": "great_tables/_modify_rows.py",
+    "warning": 29,
+    "total": 36,
+    "convention": 4,
+    "refactor": 3
+  },
+  {
+    "arquivo": "great_tables/_formats_vals.py",
+    "convention": 4,
+    "total": 35,
+    "warning": 4,
+    "refactor": 27
+  },
+  {
+    "arquivo": "great_tables/_export.py",
+    "convention": 14,
+    "total": 33,
+    "refactor": 10,
+    "warning": 8,
+    "error": 1
+  },
+  {
+    "arquivo": "great_tables/_helpers.py",
+    "convention": 26,
+    "total": 30,
+    "warning": 1,
+    "refactor": 3
+  },
+  {
+    "arquivo": "great_tables/_styles.py",
+    "convention": 21,
+    "total": 29,
+    "warning": 6,
+    "refactor": 2
+  },
+  {
+    "arquivo": "great_tables/_substitution.py",
+    "warning": 4,
+    "total": 26,
+    "convention": 11,
+    "refactor": 11
+  },
+  {
+    "arquivo": "great_tables/_utils.py",
+    "warning": 12,
+    "total": 25,
+    "convention": 10,
+    "refactor": 2,
+    "error": 1
+  },
+  {
+    "arquivo": "great_tables/data/__init__.py",
+    "convention": 5,
+    "total": 24,
+    "warning": 2,
+    "refactor": 17
+  },
+  {
+    "arquivo": "great_tables/_data_color/base.py",
+    "convention": 11,
+    "total": 23,
+    "warning": 5,
+    "refactor": 7
+  },
+  {
+    "arquivo": "great_tables/_boxhead.py",
+    "convention": 5,
+    "total": 18,
+    "warning": 13
+  },
+  {
+    "arquivo": "great_tables/vals.py",
+    "convention": 1,
+    "total": 15,
+    "warning": 14
+  },
+  {
+    "arquivo": "great_tables/_utils_selenium.py",
+    "convention": 3,
+    "total": 13,
+    "error": 2,
+    "refactor": 5,
+    "warning": 3
+  },
+  {
+    "arquivo": "great_tables/_scss.py",
+    "warning": 8,
+    "total": 12,
+    "convention": 2,
+    "refactor": 2
+  },
+  {
+    "arquivo": "great_tables/shiny.py",
+    "convention": 5,
+    "total": 12,
+    "warning": 5,
+    "refactor": 1,
+    "error": 1
+  },
+  {
+    "arquivo": "great_tables/_cols_merge.py",
+    "convention": 1,
+    "total": 10,
+    "warning": 5,
+    "refactor": 4
+  },
+  {
+    "arquivo": "great_tables/_locale.py",
+    "convention": 8,
+    "total": 9,
+    "refactor": 1
+  },
+  {
+    "arquivo": "great_tables/_databackend.py",
+    "convention": 3,
+    "total": 7,
+    "refactor": 3,
+    "error": 1
+  },
+  {
+    "arquivo": "great_tables/_text.py",
+    "convention": 6,
+    "total": 7,
+    "refactor": 1
+  },
+  {
+    "arquivo": "great_tables/utils_render_common.py",
+    "warning": 3,
+    "total": 7,
+    "convention": 4
+  },
+  {
+    "arquivo": "great_tables/_tab_create_modify.py",
+    "convention": 4,
+    "total": 6,
+    "warning": 2
+  },
+  {
+    "arquivo": "great_tables/_render_checks.py",
+    "convention": 1,
+    "total": 5,
+    "warning": 2,
+    "refactor": 2
+  },
+  {
+    "arquivo": "great_tables/_render.py",
+    "convention": 4,
+    "total": 5,
+    "refactor": 1
+  },
+  {
+    "arquivo": "great_tables/_data_color/palettes.py",
+    "convention": 2,
+    "total": 5,
+    "refactor": 2,
+    "warning": 1
+  },
+  {
+    "arquivo": "great_tables/__init__.py",
+    "convention": 3,
+    "total": 4,
+    "error": 1
+  },
+  {
+    "arquivo": "great_tables/_tbl_data_align.py",
+    "refactor": 4,
+    "total": 4
+  },
+  {
+    "arquivo": "great_tables/_footnotes.py",
+    "convention": 2,
+    "total": 4,
+    "warning": 2
+  },
+  {
+    "arquivo": "great_tables/_types.py",
+    "convention": 2,
+    "total": 2
+  },
+  {
+    "arquivo": "great_tables/loc.py",
+    "convention": 1,
+    "total": 2,
+    "warning": 1
+  },
+  {
+    "arquivo": "great_tables/_source_notes.py",
+    "convention": 1,
+    "total": 2,
+    "warning": 1
+  },
+  {
+    "arquivo": "great_tables/_body.py",
+    "convention": 2,
+    "total": 2
+  },
+  {
+    "arquivo": "great_tables/_data_color/constants.py",
+    "convention": 2,
+    "total": 2
+  },
+  {
+    "arquivo": "great_tables/_pipe.py",
+    "convention": 1,
+    "total": 1
+  },
+  {
+    "arquivo": "great_tables/_stub.py",
+    "convention": 1,
+    "total": 1
+  },
+  {
+    "arquivo": "great_tables/_stubhead.py",
+    "convention": 1,
+    "total": 1
+  },
+  {
+    "arquivo": "great_tables/style.py",
+    "convention": 1,
+    "total": 1
+  },
+  {
+    "arquivo": "great_tables/quarto.py",
+    "convention": 1,
+    "total": 1
+  },
+  {
+    "arquivo": "great_tables/_heading.py",
+    "convention": 1,
+    "total": 1
+  },
+  {
+    "arquivo": "great_tables/_data_color/__init__.py",
+    "convention": 1,
+    "total": 1
+  }
+]
